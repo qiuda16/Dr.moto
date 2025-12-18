@@ -67,16 +67,25 @@
     <!-- Parts Selector Sheet -->
     <van-action-sheet v-model:show="showParts" title="Add Part / Labor">
       <div class="sheet-content">
-        <van-field v-model="partSearch" placeholder="Search part (e.g. Oil)" />
+        <van-field 
+          v-model="partSearch" 
+          placeholder="Search part (e.g. Oil)" 
+          @update:model-value="onSearchPart"
+        />
         <div class="part-results">
-          <!-- Mock Results -->
-          <div class="part-item" @click="addPart('Motul 7100', 80)">
-            <span>Motul 7100 4L</span>
-            <span>$80</span>
+          <div v-if="loadingParts" class="loading-parts">Loading...</div>
+          <div 
+            v-else
+            class="part-item" 
+            v-for="part in partResults" 
+            :key="part.id"
+            @click="addPart(part)"
+          >
+            <span class="part-name">{{ part.name }}</span>
+            <span class="part-price">${{ part.list_price }}</span>
           </div>
-          <div class="part-item" @click="addPart('Labor Hour', 100)">
-            <span>Labor (1h)</span>
-            <span>$100</span>
+          <div v-if="!loadingParts && partResults.length === 0 && partSearch" class="no-results">
+            No parts found
           </div>
         </div>
       </div>
@@ -89,12 +98,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '../utils/request'
-import { showToast, showSuccessToast } from 'vant'
+import { showToast, showSuccessToast, showLoadingToast } from 'vant'
+import DiagnosisPanel from '../components/DiagnosisPanel.vue'
 
 const route = useRoute()
 const order = ref(null)
 const showParts = ref(false)
 const partSearch = ref('')
+const partResults = ref([])
+const loadingParts = ref(false)
+let searchTimer = null
 
 onMounted(() => loadOrder())
 
@@ -119,11 +132,42 @@ const setStatus = async (status) => {
   loadOrder()
 }
 
-const addPart = async (name, price) => {
-  // In real app: POST /mp/workorders/{id}/lines
-  // Here we just mock it visually or call a hypothetical endpoint
-  showToast(`Added ${name}`)
-  showParts.value = false
+const onSearchPart = async (val) => {
+  if (!val) {
+    partResults.value = []
+    return
+  }
+  
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(async () => {
+    loadingParts.value = true
+    try {
+      const res = await request.get(`/mp/inventory/products`, { params: { query: val } })
+      partResults.value = res
+    } catch (e) {
+      console.error(e)
+    } finally {
+      loadingParts.value = false
+    }
+  }, 500)
+}
+
+const addPart = async (part) => {
+  showLoadingToast('Adding...')
+  try {
+    await request.post('/mp/inventory/issue', {
+      work_order_id: order.value.id,
+      product_id: part.id,
+      quantity: 1
+    })
+    showSuccessToast(`Added ${part.name}`)
+    showParts.value = false
+    partSearch.value = ''
+    partResults.value = []
+    loadOrder() // Refresh lines
+  } catch (err) {
+    showToast('Failed to add part')
+  }
 }
 </script>
 
@@ -141,6 +185,9 @@ const addPart = async (name, price) => {
 .total-bar { text-align: right; font-weight: bold; font-size: 18px; padding-top: 10px; border-top: 1px solid #eee; }
 .waiting-text { text-align: center; color: #999; font-style: italic; }
 
-.sheet-content { padding: 10px 20px 40px; }
-.part-item { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; }
+.sheet-content { padding: 10px 20px 40px; height: 300px; display: flex; flex-direction: column; }
+.part-results { flex: 1; overflow-y: auto; margin-top: 10px; }
+.part-item { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; cursor: pointer; }
+.part-name { font-weight: 500; }
+.loading-parts, .no-results { text-align: center; color: #999; padding: 20px; }
 </style>

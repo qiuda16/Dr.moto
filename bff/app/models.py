@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from .core.db import Base
 
@@ -12,6 +12,41 @@ class PaymentLedger(Base):
     status = Column(String, default="pending")
     provider = Column(String, default="wechat")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class PaymentEvent(Base):
+    __tablename__ = "payment_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider_ref = Column(String, index=True) # e.g. wechat transaction id
+    raw_payload = Column(String) # JSON or Raw string
+    signature_verified = Column(Boolean, default=False)
+    processing_status = Column(String) # processed, error, ignored
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    trace_id = Column(String, index=True, nullable=True)
+    actor_id = Column(String, index=True) # User ID or 'system'
+    action = Column(String, nullable=False) # e.g. "update_status"
+    target_entity = Column(String) # e.g. "work_order:uuid"
+    before_state = Column(JSON, nullable=True)
+    after_state = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Quote(Base):
+    __tablename__ = "quotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    work_order_uuid = Column(String, index=True, nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    items_json = Column(JSON, nullable=False) # Snapshot of line items
+    amount_total = Column(Float, nullable=False)
+    is_active = Column(Boolean, default=True)
+    status = Column(String, default="draft") # draft, presented, confirmed, rejected
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_by = Column(String, nullable=True)
 
 class WorkOrderAttachment(Base):
     __tablename__ = "work_order_attachments"
@@ -44,6 +79,7 @@ class WorkOrder(Base):
     vehicle_key = Column(String, nullable=True) # e.g., TOYOTA|COROLLA|2020|1.8
     description = Column(String, nullable=True)
     status = Column(String, default="draft")
+    active_quote_version = Column(Integer, nullable=True) # Links to Quote.version
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Vehicle(Base):

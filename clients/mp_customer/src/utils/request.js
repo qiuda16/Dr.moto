@@ -19,9 +19,11 @@ service.interceptors.request.use(
     }
 
     // 2. Idempotency Key for mutation requests
-    if (['post', 'put', 'delete'].includes(config.method)) {
-      config.headers['Idempotency-Key'] = uuidv4();
-    }
+    // (Handled manually in components for critical actions, or auto-generated here if needed)
+    // We prefer manual control for critical business logic (Payment/Quote) to retry safely.
+    // if (['post', 'put', 'delete'].includes(config.method) && !config.headers['X-Idempotency-Key']) {
+    //   config.headers['X-Idempotency-Key'] = uuidv4();
+    // }
 
     // 3. Trace ID
     config.headers['X-Trace-Id'] = uuidv4();

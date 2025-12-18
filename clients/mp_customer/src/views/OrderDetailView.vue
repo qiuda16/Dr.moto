@@ -72,7 +72,7 @@
       <div class="action-dock" v-if="canAction">
         <div v-if="order.status === 'quoted'" class="dock-inner">
           <div class="summary">
-            <span>Total to pay</span>
+            <span>Total to pay (v{{ order.data.odoo.quote_version || 1 }})</span>
             <span class="big-price">${{ order.data.odoo.amount_total }}</span>
           </div>
           <van-button color="#3e64ff" round block @click="confirmQuote">Accept & Start</van-button>
@@ -94,7 +94,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '../utils/request'
-import { showSuccessToast, showConfirmDialog } from 'vant'
+import { showSuccessToast, showConfirmDialog, showFailToast } from 'vant'
+import { v4 as uuidv4 } from 'uuid'
 
 const route = useRoute()
 const order = ref(null)
@@ -124,18 +125,43 @@ const hasQuote = computed(() => order.value?.data?.odoo?.lines?.length > 0)
 const canAction = computed(() => ['quoted', 'ready'].includes(order.value?.status))
 
 const confirmQuote = () => {
-  showConfirmDialog({ title: 'Approve Estimate', message: 'Start repairs now?' })
+  // Check version
+  const currentVersion = order.value.data.odoo.quote_version || 1;
+  
+  showConfirmDialog({ title: 'Approve Estimate', message: `Start repairs now? (Quote v${currentVersion})` })
     .then(async () => {
-      await request.post(`/mp/workorders/${order.value.id}/status?status=in_progress`)
-      showSuccessToast('Approved')
-      loadOrder()
+      try {
+        // Send Idempotency Key & Version Check
+        await request.post(
+          `/mp/workorders/${order.value.id}/status?status=in_progress`, 
+          { quote_version: currentVersion },
+          { headers: { 'X-Idempotency-Key': uuidv4() } }
+        )
+        showSuccessToast('Approved')
+        loadOrder()
+      } catch (e) {
+        // Error handled by interceptor, but we can add specific handling
+        if (e.response?.status === 409) showFailToast('Version mismatch, refreshing...')
+        loadOrder()
+      }
     })
 }
 
 const payNow = async () => {
-  await request.post(`/mp/workorders/${order.value.id}/status?status=done`)
-  showSuccessToast('Paid')
-  loadOrder()
+  // Mock Payment Flow
+  const idempotencyKey = uuidv4()
+  
+  try {
+    await request.post(
+      `/mp/workorders/${order.value.id}/status?status=done`,
+      {},
+      { headers: { 'X-Idempotency-Key': idempotencyKey } }
+    )
+    showSuccessToast('Paid')
+    loadOrder()
+  } catch (e) {
+    // Retry or Fail
+  }
 }
 </script>
 

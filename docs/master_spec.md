@@ -1,240 +1,127 @@
-# 全项目总规范（MASTER SPEC）
+# DrMoto Master Architecture & Boundaries
+> "First set rules, then do functions"
 
-> 版本：v1.0  
-> 适用范围：Odoo 核心 + 自研维修域模块 + BFF/API + 微信小程序 + 客服工作台 + AI 智能客服 + 报表  
-> 更新日期：2025-12-17
+## 0. Global Architecture & Boundaries
+### 0.1 Roles & Ends
+*   **Customer App (WeChat MP):** Submit requests, auth vehicle, view progress, confirm quote, pay, review.
+*   **Technician App (WeChat MP / Pad Web):** Accept orders, diagnose, log labor/parts, evidence (photo/video), update nodes.
+*   **Display Terminal (Store Screen):** No login/weak login, read-only "Queue, Progress, ETA".
+*   **Admin Terminal (Store Manager/Front/Finance/Warehouse):** Scheduling, Quote Audit, Refund/Reverse, Inventory Ops (Odoo), Reconciliation.
+*   **BFF:** Single Entry Point (Auth, Rate Limit, Idempotency, Audit, Aggregation).
+*   **Odoo:** Inventory, Product, Stock Moves, Cost, Invoices ("Truth System").
 
-## 0) 文档定位与用法
-- 本规范是唯一权威输入：编程 AI 生成代码、数据库、接口、页面、测试、部署均必须遵循。
-- 关键词含义：
-  - **MUST**：强制，任何情况下不得违反。
-  - **SHOULD**：强烈建议，除非有明确理由并记录 ADR 决策。
-  - **MAY**：可选能力，不影响 MVP 闭环。
+### 0.2 Event Driven
+*   "Work Order Status Change", "Payment Callback", "Stock Move" -> Domain Events (DB -> Outbox -> Async).
+*   Avoid end-to-end strong coupling.
 
----
+## 1. Customer App Design
+### 1.1 MVP Loop
+1.  **Login/Bind:** WeChat silent login + Phone.
+2.  **Vehicle:** Add (VIN/Frame/Year) + Bind Store.
+3.  **Work Order:** Create (Desc + Media + Booking).
+4.  **Progress:** Timeline (Submitted -> Accepted -> Diagnosing -> Quote -> Repairing -> Pay -> Done).
+5.  **Quote:** Show details (Labor, Parts, Tax) + **Version Control**.
+6.  **Payment:** WeChat Pay + Invoice.
+7.  **Review:** Star + Tag + Text.
 
-## 1) 项目目标与范围
+### 1.2 Information Architecture
+*   **Home:** Active Orders + "Quick Fix".
+*   **Order:** List (Active/History) + Filter.
+*   **Message:** Notifications.
+*   **Profile:** Vehicle, Store, Info.
 
-### 1.1 总目标
-1. **稳定性第一**：库存/支付/结算等交易链路必须强一致、可审计、可冲正。
-2. **可扩展**：当前单门店/单仓库运行；所有核心表与接口从第一天支持未来多门店/多仓库（字段、权限、过滤逻辑必须存在）。
-3. **可运营**：支持门店日常流程闭环（接车→检测→报价→维修→领料→完工→交付→收款→回访/质保）。
+### 1.3 Stability Keys
+*   **Weak Net:** Queue uploads, retry, no base64 large files.
+*   **Idempotency:** Client generates UUID for Create/Confirm/Pay.
+*   **Quote Version:** `quote_version` mismatch -> Block Payment.
 
-### 1.2 MVP 范围（MUST 实现）
-- 客户/车辆建档（车主端或门店端）
-- 工单创建与状态流转（含日志）
-- 检测记录与报价（工时+配件，含报价版本）
-- 领料/退料（强制走库存事务，幂等）
-- 完工交付确认
-- 收款记录（微信支付优先；至少支持线下收款登记）
-- 基础报表（工单、领料、收款、配件消耗）
-- 审计日志与关键链路可观测
+## 2. Technician App Design
+### 2.1 Core Workbench
+*   **Inbox:** Filter by Store/Station/Skill.
+*   **In Progress:** My Orders, Timer, Node Buttons.
+*   **Diagnosis:** Codes/Conclusion/Advice (Templates).
+*   **Evidence:** Photo/Video/Voice-to-Text.
+*   **Parts Request:** Select Odoo Product + Qty -> Request.
+*   **Completion:** Self-check checklist.
 
-### 1.3 非 MVP（Phase 2，MAY 预留）
-- 预约/排班/工位管理
-- 会员积分/优惠券/套餐
-- 多门店多仓、门店间调拨
-- 供应商比价、自动补货、安全库存
-- 电子签名、电子合同、发票全链路
-- 更复杂财务核算与自动对账
+### 2.2 Auth & Risk
+*   Tech updates *process*, not *money/inventory truth*.
+*   "Request" -> Odoo Move (Confirmed by Warehouse/System).
 
----
+### 2.3 State Machine
+`SUBMITTED` -> `ACCEPTED` -> `DIAGNOSING` -> `QUOTED` -> `CUSTOMER_CONFIRMED` -> `REPAIRING` -> `READY_TO_PAY` -> `PAID` -> `CLOSED` / `CANCELED`
 
-## 2) 总体架构与系统边界（MUST）
+## 3. Display Terminal Design
+### 3.1 Content
+*   **Queue:** Ticket/Short ID (Masked) + Status + Station.
+*   **ETA:** Range (e.g., 30-60 mins).
+*   **Notice:** Store info.
 
-### 2.1 架构
-- **Odoo（核心 ERP）**：库存、产品、采购（可选先启用）、财务（可逐步启用）、员工/权限基础。
-- **PostgreSQL（Odoo 主库）**：只由 Odoo 使用；禁止业务侧直改 Odoo 交易表。
-- **BFF/API 服务（自研）**：微信小程序与外部系统唯一入口；鉴权、幂等、限流、编排、对接 Odoo/微信/对象存储/MQ。
-- **Redis**：会话/缓存/分布式锁（仅短期状态与防重，不作最终数据源）。
-- **MQ**：异步任务与事件总线（AI、报表、通知、同步）。
-- **对象存储**：图片/视频/PDF；数据库仅存元数据与 URL。
+### 3.2 Tech
+*   Web SPA, Read-only BFF API.
+*   Cache: 30-60s refresh.
+*   Security: IP whitelist or Store Token.
 
-### 2.2 数据归属（强制红线）
-- **库存数量的增减 MUST 只通过 Odoo 库存事务完成**（出库/入库/退料/冲正均产生单据并过账）。
-- 小程序 **不得** 直连数据库或直连 Odoo 内部接口绕过 BFF。
-- AI 服务 **不得** 直接写入任何交易数据（只读查询通过 BFF）。
+## 4. Admin Terminal Design
+### 4.1 Manager/Front
+*   Scheduling, Quote Audit (Thresholds), Settlement.
+### 4.2 Warehouse
+*   Outbound (from Request), Inbound (Returns), Audit.
+### 4.3 Finance
+*   Payment Stream (Raw/Signed/Idempotent), Invoicing.
 
----
+## 5. BFF / API Layer
+### 5.1 Responsibilities
+*   **Auth:** JWT/WeChat/Token.
+*   **Resilience:** Rate Limit, Circuit Breaker.
+*   **Idempotency:** Mandatory for write ops.
+*   **Audit:** Who/When/What.
+*   **Aggregation:** Odoo Objects -> Client DTOs.
 
-## 3) 角色与权限（业务级定义 + 数据范围）
+### 5.2 Domains
+*   `/mp/*` (Customer)
+*   `/tech/*` (Tech)
+*   `/admin/*` (Admin)
+*   `/display/*` (Read-only)
+*   `/webhooks/*` (Callbacks)
 
-### 3.1 角色列表（MVP MUST）
-- **OWNER/MANAGER**（门店老板/店长）
-- **ADVISOR**（前台接待）
-- **TECH**（技师）
-- **KEEPER**（仓管）
-- **CASHIER**（收银）
-- **ADMIN**（系统管理员）
-- **CUSTOMER**（车主用户，小程序）
+### 5.3 Schema Recommendations
+*   `idempotency_keys`: (key, route, hash, response, status, created_at)
+*   `audit_log`: Append-only (who, when, what, before, after, trace_id)
+*   `payment_events`: Append-only (raw, verified, status)
 
-### 3.2 数据范围规则（MUST）
-- 所有业务数据均具备 `shop_id`；当前默认只有一个门店，但过滤逻辑必须存在。
-- 默认：员工只能访问所属 `shop_id` 数据；ADMIN 可跨门店（Phase 2 扩展）。
+## 6. Odoo Integration
+### 6.1 Odoo Objects
+*   Product, Inventory, Moves, Invoice/Sale.
+### 6.2 Anti-Corruption
+*   BFF Adapter (REST/XML-RPC).
+*   Map Odoo errors to stable Error Codes.
 
-### 3.3 权限原则（MUST）
-- 权限校验必须在服务端执行（BFF 和/或 Odoo），前端隐藏按钮不算权限控制。
-- 任何高风险动作必须审计：改价、作废、退款、退料、冲正、手工关闭工单。
+## 7. AI Capabilities
+*   **P0:** KB QA, Form Assist (RAG).
+*   **P1:** Diagnosis Assist.
+*   **P2:** Quality Check (Media/Checklist).
+*   **Safety:** AI cannot write to Odoo/DB directly; must use BFF Tools.
 
----
+## 8. Edge / IoT
+*   Device Reg, Event Upstream.
+*   Media: Upload Screenshot/Clip -> Object Storage -> BFF Index.
+*   Bind Events to Work Orders.
 
-## 4) 核心业务流程（MVP MUST）
+## 9. Database & Storage
+### 9.1 Truth Layering
+*   **Odoo Postgres:** Inventory/Money Truth.
+*   **BFF Postgres:** Users, Vehicles, WO Aggregates, Audit, Logs.
 
-### 4.1 工单主流程（MUST）
-1. 建档：客户/车辆（plate_no 必填）
-2. 接车 CHECKIN：里程、问题描述、照片
-3. 检测 DIAGNOSING：检测项、图片、建议
-4. 报价 QUOTED：报价版本（工时行+配件行），客户确认
-5. 维修 IN_PROGRESS：允许追加项目（形成新版本或差额单）
-6. 领料/退料：严格走库存事务（见第 6 节）
-7. 完工 READY：质检确认
-8. 交付 DELIVERED：交付确认与质保说明
-9. 收款并关闭 CLOSED：支付成功或线下收款登记后关闭
+### 9.2 BFF Core Tables
+*   `users`, `vehicles`, `work_orders`, `work_order_timeline`.
+*   `quotes` (version, json, status).
+*   `payments` (intent, amount, status).
+*   `payment_events` (immutable).
+*   `audit_log` (global).
 
-### 4.2 状态机（MUST）
-- `DRAFT` → `CHECKIN` → `DIAGNOSING` → `QUOTED` → `IN_PROGRESS` → `READY` → `DELIVERED` → `CLOSED`
-- `CANCELLED`（作废）
-
-规则：
-- 状态变更必须写入 `wo_status_log`（from/to/operator/reason/time/trace_id）。
-- `CLOSED` 后禁止直接改金额与明细；只能冲正或追加差额单据。
-
----
-
-## 5) 计价与结算规则（MVP MUST）
-
-### 5.1 费用构成
-- 工时费（Labor Lines）
-- 配件费（Part Lines）
-- 折扣（整单/逐行）
-- 抹零（rounding，MVP 可先不启用复杂规则）
-- 税（字段预留，Phase 2 可启用复杂税）
-
-### 5.2 价格锁定与版本（MUST）
-- 报价 `quotation_version`：每次改价/追加项目生成新版本并保留历史。
-- 客户确认后：该版本视为“锁价基准”；追加项目必须形成新版本或差额单。
-
-### 5.3 退款/改价（MUST）
-- 任何退款必须形成“冲正/退款单据”，不得直接删除收款记录。
-- 已结算后改价：走差额单/冲正+重开，并记录原因与审批人。
-
----
-
-## 6) 库存与交易一致性（最高优先级，MUST）
-
-### 6.1 幂等（强制）
-下列动作必须有 `idempotency_key` 且数据库唯一：
-- 领料（ISSUE）
-- 退料（RETURN）
-- 冲正（REVERSE）
-- 支付回调（WECHAT_NOTIFY）
-- 开票/入账（INVOICE_POST，Phase 2）
-
-幂等键示例：
-- `WO:{work_order_id}:ISSUE:{batch_no}`
-- `WO:{work_order_id}:RETURN:{batch_no}`
-- `PAY:WX:{out_trade_no}`
-
-幂等处理要求：
-- 重复请求必须返回首次成功结果，不得二次扣库存/入账。
-
-### 6.2 领料（MUST）
-- 领料会在 Odoo 产生出库单据并过账（Done），然后回写工单配件行：
-  - `qty_issued` 累加
-  - 记录 `odoo_picking_id/odoo_move_id`
-- 工单侧不得自行扣减库存数量。
-
-### 6.3 退料/作废（MUST）
-- 退料必须产生反向入库单据并过账。
-- 作废领料必须用冲正（逆向单据），禁止删除原领料记录。
-
----
-
-## 7) 数据模型与数据字典（MVP MUST）
-
-### 7.1 关键实体（逻辑模型）
-- `shop`
-- `employee`
-- `customer`
-- `vehicle`
-- `work_order`
-- `wo_labor_line`
-- `wo_part_line`
-- `wo_media`
-- `wo_status_log`
-- `payment`（不可变）
-- `audit_log`
-- `idempotency_record`
-
-### 7.2 必备字段规则（MUST）
-- 所有业务主表：`shop_id`
-- 所有库存相关行：`warehouse_id`
-- 金额相关字段必须预留：`currency`、`tax_included`、`discount`、`rounding`
-- 所有关键表必须有创建/更新时间或 Odoo 等效字段。
-
-### 7.3 存储规则（MUST）
-- 图片/视频/PDF 不入 PG：只存对象存储 URL + hash + size + content_type。
-- 大表候选按月分区：`wo_status_log`、`audit_log`、`event_outbox`（若使用）。
-
----
-
-## 8) 前端应用（MVP MUST）
-- 车主端小程序：登录、车辆、发起工单、查看进度、报价确认、微信支付
-- 门店端：工单看板、检测、报价、领料/退料、收银关闭、基础报表
-- 客服工作台：用户/工单检索、快捷回复、知识库检索、AI（只读）
-
----
-
-## 9) API 契约（BFF 对外唯一入口，MUST）
-- 鉴权、权限校验、统一响应格式、trace_id
-- 关键写接口支持 `Idempotency-Key`
-- 关键错误码：`WO_INVALID_STATE`、`IDEMPOTENCY_CONFLICT`、`INVENTORY_POST_FAILED`、`PAYMENT_ALREADY_PROCESSED` 等
-
----
-
-## 10) 报表口径（MVP MUST）
-- 工单金额：以最终确认版本/差额单汇总
-- 收款金额：以不可变 payment 为准（退款为负向或关联退款记录）
-- 配件消耗：以 Odoo 已过账出库为准
-
----
-
-## 11) 异常处理与冲正 SOP（MUST）
-- 错扣库存：退料/冲正，禁止删改
-- 回调风暴：幂等 + 快速返回 + 可追踪
-- 已结算改价：差额单/冲正重开
-- 退款：生成退款记录关联原收款
-- 作废：如已发生库存/收款必须先冲正/退款
-
----
-
-## 12) 可观测、测试与交付标准（MUST）
-- trace_id 全链路
-- 最低集成测试：领料幂等、支付幂等、CLOSED 禁改价、退料净额一致
-- 每次交付必须包含：代码、迁移说明、API 契约、启动验证、最小测试
-
----
-
-## 13) 禁止事项（Hard No，MUST）
-- 小程序绕过 BFF
-- 自研直改 Odoo 核心库存/会计表
-- 删除历史交易修数据
-- 硬编码密钥
-- 幂等未做上线支付回调与领料接口
-
----
-
-## 14) 实施顺序（Backlog）
-1. infra：Odoo+PG+Redis+MQ+对象存储
-2. Odoo 主数据与权限
-3. 维修域模块：工单+状态机+日志
-4. 报价版本
-5. 领料/退料：对接 Odoo 单据 + 幂等回写
-6. 支付：创建单+回调幂等+关闭工单
-7. 报表：工单/收款/配件消耗
-8. 审计与可观测完善
-
----
-
-## 15) 变更管理（MUST）
-- 任何违反 MUST 的需求变更必须走 ADR，并评估风险与回滚方案。
+## 10. Analytics
+*   **Funnel:** Submit -> Pay.
+*   **Efficiency:** Time metrics.
+*   **Inventory:** Turns, Stockout.
+*   **Path:** BFF Events -> Lightweight DW (PG View) -> Reports.

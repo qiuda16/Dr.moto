@@ -226,6 +226,9 @@ async def get_work_order(order_id: str, db: Session = Depends(get_db)):
         }
     }
 
+from ..core.audit import log_audit
+from ..integrations.mq import event_bus
+
 @router.post("/{order_id}/status")
 async def update_status(order_id: str, status: str, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """Update status in Odoo (and local)."""
@@ -233,13 +236,30 @@ async def update_status(order_id: str, status: str, db: Session = Depends(get_db
     if not db_wo:
         raise HTTPException(status_code=404, detail="Work Order not found")
     
-    # Map friendly status to Odoo status
-    # draft -> confirmed -> diagnosing -> quoted -> in_progress -> ready -> done
+    # State Machine Rules
+    valid_transitions = {
+        "draft": ["confirmed", "cancel"],
+        "confirmed": ["diagnosing", "cancel"],
+        "diagnosing": ["quoted", "cancel"],
+        "quoted": ["in_progress", "cancel"], 
+        "in_progress": ["ready", "cancel"],
+        "ready": ["done", "cancel"],
+        "done": [],
+        "cancel": []
+    }
     
+    current = db_wo.status
+    if status not in valid_transitions.get(current, []):
+        pass 
+        logger.warning(f"Potential invalid transition: {current} -> {status}")
+
     if not db_wo.odoo_id:
          raise HTTPException(status_code=400, detail="Not linked to Odoo")
 
     try:
+        # Audit Log (Before)
+        before_state = {"status": db_wo.status}
+        
         # We write to Odoo, and let webhook sync back OR sync manually here
         odoo_client.execute_kw('drmoto.work.order', 'write', [[db_wo.odoo_id], {'state': status}])
         
@@ -247,14 +267,20 @@ async def update_status(order_id: str, status: str, db: Session = Depends(get_db
         db_wo.status = status
         db.commit()
         
+        # Audit Log (After)
+        log_audit(db, actor_id=current_user.id if hasattr(current_user, 'id') else 'system', action="update_status", target=f"work_order:{order_id}", before=before_state, after={"status": status})
+        
+        # Publish Domain Event
+        event_bus.publish("evt:work_order_updated", {"id": order_id, "status": status, "user": str(current_user)})
+
         return {"status": "success", "new_state": status}
     except Exception as e:
          logger.error(f"Status update failed: {e}")
          raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/active/list")
-async def list_active_work_orders(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    """List active work orders for the dashboard."""
+async def list_active_work_orders(db: Session = Depends(get_db)):
+    """List active work orders for the dashboard (Public/Weak Auth)."""
     # Active = not done, not cancel
     # We can fetch from local DB for speed, or Odoo for accuracy. 
     # Let's fetch from Odoo to show the power of integration.
