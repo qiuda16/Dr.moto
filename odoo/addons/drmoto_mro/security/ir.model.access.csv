@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_drmoto_work_order,drmoto.work.order,model_drmoto_work_order,base.group_user,1,1,1,1
+access_drmoto_work_order_line,drmoto.work.order.line,model_drmoto_work_order_line,base.group_user,1,1,1,1
+access_drmoto_vehicle,drmoto.vehicle,model_drmoto_vehicle,base.group_user,1,1,1,1
+access_drmoto_partner_vehicle,drmoto.partner.vehicle,model_drmoto_partner_vehicle,base.group_user,1,1,1,1
+access_drmoto_procedure,drmoto.procedure,model_drmoto_procedure,base.group_user,1,1,1,1
+access_drmoto_procedure_step,drmoto.procedure.step,model_drmoto_procedure_step,base.group_user,1,1,1,1
+access_drmoto_procedure_part,drmoto.procedure.part,model_drmoto_procedure_part,base.group_user,1,1,1,1

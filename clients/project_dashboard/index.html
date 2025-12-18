@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrMoto Project Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .markdown-body h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+        .markdown-body h2 { font-size: 1.5em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+        .markdown-body h3 { font-size: 1.25em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+        .markdown-body ul { list-style-type: disc; padding-left: 2em; margin-bottom: 1em; }
+        .markdown-body ol { list-style-type: decimal; padding-left: 2em; margin-bottom: 1em; }
+        .markdown-body li { margin-bottom: 0.25em; }
+        .markdown-body pre { background: #f6f8fa; padding: 1em; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
+        .markdown-body code { background: #f6f8fa; padding: 0.2em 0.4em; border-radius: 3px; font-family: monospace; font-size: 0.9em; }
+        .markdown-body pre code { background: transparent; padding: 0; }
+        .markdown-body blockquote { border-left: 4px solid #dfe2e5; color: #6a737d; padding-left: 1em; margin-bottom: 1em; }
+        .markdown-body table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+        .markdown-body th, .markdown-body td { border: 1px solid #dfe2e5; padding: 0.5em; }
+        .markdown-body th { background: #f6f8fa; font-weight: bold; }
+        
+        /* Checklist Styling */
+        .markdown-body input[type="checkbox"] { margin-right: 0.5em; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col overflow-hidden text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md z-10 flex-none">
+        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-project-diagram text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-tight">DrMoto Project Dashboard</h1>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <span id="connection-status" class="flex items-center px-2 py-1 rounded bg-indigo-700">
+                    <div class="w-2 h-2 rounded-full bg-yellow-400 mr-2 animate-pulse"></div>
+                    Connecting...
+                </span>
+                <button onclick="refreshData()" class="hover:text-indigo-200 transition"><i class="fas fa-sync-alt"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: File Browser -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col flex-none">
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+                <h2 class="font-semibold text-slate-600 uppercase text-xs tracking-wider mb-2">Documentation Files</h2>
+                <div class="relative">
+                    <input type="text" id="file-search" placeholder="Filter files..." class="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-indigo-500 transition">
+                    <i class="fas fa-search absolute left-2.5 top-2 text-slate-400 text-xs"></i>
+                </div>
+            </div>
+            <div id="file-list" class="flex-1 overflow-y-auto p-2 space-y-0.5">
+                <!-- File items will be injected here -->
+                <div class="text-center py-8 text-slate-400 text-sm">Loading files...</div>
+            </div>
+        </aside>
+
+        <!-- Center: Content Display -->
+        <section class="flex-1 flex flex-col min-w-0 bg-white">
+            <div id="content-header" class="h-12 border-b border-slate-200 flex items-center justify-between px-6 bg-white sticky top-0 z-10 hidden">
+                <div class="flex items-center text-slate-600">
+                    <i class="far fa-file-alt mr-2 text-indigo-500"></i>
+                    <span id="current-filename" class="font-medium truncate">Select a file</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="analyzeCurrent()" class="px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition">
+                        <i class="fas fa-magic mr-1"></i> Analyze
+                    </button>
+                </div>
+            </div>
+            <div id="content-viewer" class="flex-1 overflow-y-auto p-8 relative">
+                <!-- Markdown content -->
+                <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                    <i class="far fa-folder-open text-5xl mb-4 opacity-50"></i>
+                    <p>Select a README file from the sidebar to view content</p>
+                </div>
+                <div id="markdown-container" class="markdown-body max-w-4xl mx-auto hidden pb-20"></div>
+            </div>
+        </section>
+
+        <!-- Right Sidebar: Analysis (Collapsible) -->
+        <aside class="w-80 bg-slate-50 border-l border-slate-200 flex flex-col flex-none shadow-xl z-20 transform transition-transform duration-300" id="analysis-panel">
+            <div class="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
+                <h2 class="font-semibold text-slate-700 flex items-center">
+                    <i class="fas fa-tasks mr-2 text-green-500"></i> Requirement Check
+                </h2>
+                <!-- Progress Ring -->
+                <div class="relative w-10 h-10">
+                     <svg class="w-full h-full" viewBox="0 0 36 36">
+                        <path class="text-slate-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
+                        <path id="progress-ring" class="text-green-500 transition-all duration-1000 ease-out" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-600" id="progress-text">0%</div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-4" id="analysis-results">
+                <div class="text-sm text-slate-500 text-center mt-10">
+                    Open a file to see automatic analysis of checklist items.
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:8080'; // BFF Address
+        let currentFile = null;
+
+        // --- Core Functions ---
+
+        async function init() {
+            try {
+                const health = await fetch(`${API_BASE}/health`);
+                if(health.ok) {
+                    document.getElementById('connection-status').innerHTML = '<div class="w-2 h-2 rounded-full bg-green-400 mr-2"></div> Connected';
+                    refreshData();
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (e) {
+                document.getElementById('connection-status').innerHTML = '<div class="w-2 h-2 rounded-full bg-red-500 mr-2"></div> Offline';
+                console.error(e);
+            }
+        }
+
+        async function refreshData() {
+            const listEl = document.getElementById('file-list');
+            listEl.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-indigo-500"></i></div>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/ops/readmes`);
+                const files = await res.json();
+                renderFileList(files);
+            } catch (e) {
+                listEl.innerHTML = `<div class="text-red-500 text-sm p-4 text-center">Failed to load files.<br>${e.message}</div>`;
+            }
+        }
+
+        function renderFileList(files) {
+            const listEl = document.getElementById('file-list');
+            listEl.innerHTML = '';
+            
+            // Group by directory depth for visual hierarchy (simplified)
+            files.sort((a, b) => a.path.localeCompare(b.path));
+
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'group flex items-center px-3 py-2 text-sm text-slate-600 rounded cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 transition';
+                // Indent based on depth
+                const depth = (file.path.match(/\//g) || []).length;
+                item.style.paddingLeft = `${depth * 1 + 0.75}rem`;
+                
+                item.innerHTML = `
+                    <i class="far fa-file-code mr-2 opacity-70 group-hover:opacity-100"></i>
+                    <div class="flex-1 truncate">
+                        <span class="font-medium">${file.name}</span>
+                        <span class="text-xs text-slate-400 ml-1 block truncate">${file.dir || 'root'}</span>
+                    </div>
+                `;
+                item.onclick = () => loadFile(file);
+                listEl.appendChild(item);
+            });
+        }
+
+        async function loadFile(file) {
+            currentFile = file;
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('content-header').classList.remove('hidden');
+            document.getElementById('current-filename').textContent = file.path;
+            const container = document.getElementById('markdown-container');
+            container.classList.remove('hidden');
+            container.innerHTML = '<div class="py-10 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-2xl"></i></div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/ops/readme/content`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({path: file.path})
+                });
+                
+                if(!res.ok) throw new Error(res.statusText);
+                
+                const data = await res.json();
+                // Render Markdown
+                container.innerHTML = marked.parse(data.content);
+                
+                // Auto-analyze
+                analyzeContent(data.content);
+                
+            } catch (e) {
+                container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded">Error loading file: ${e.message}</div>`;
+            }
+        }
+
+        function analyzeContent(markdown) {
+            const resultsEl = document.getElementById('analysis-results');
+            resultsEl.innerHTML = '';
+            
+            // 1. Extract Checklist Items
+            const regex = /- \[(x| )\] (.*)/gi;
+            let match;
+            let total = 0;
+            let checked = 0;
+            const items = [];
+
+            while ((match = regex.exec(markdown)) !== null) {
+                const isChecked = match[1].toLowerCase() === 'x';
+                items.push({
+                    checked: isChecked,
+                    text: match[2].trim()
+                });
+                total++;
+                if (isChecked) checked++;
+            }
+
+            // Update Progress
+            const percent = total === 0 ? 0 : Math.round((checked / total) * 100);
+            document.getElementById('progress-ring').setAttribute('stroke-dasharray', `${percent}, 100`);
+            document.getElementById('progress-text').textContent = `${percent}%`;
+
+            // Render Items
+            if (items.length === 0) {
+                resultsEl.innerHTML = '<div class="text-sm text-slate-400 text-center italic">No checklist items found in this document.</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `p-3 rounded border text-sm flex items-start ${item.checked ? 'bg-green-50 border-green-100' : 'bg-white border-slate-100'}`;
+                div.innerHTML = `
+                    <div class="mt-0.5 mr-2 flex-none text-${item.checked ? 'green' : 'slate'}-500">
+                        <i class="fas ${item.checked ? 'fa-check-circle' : 'fa-circle'}"></i>
+                    </div>
+                    <div class="${item.checked ? 'text-slate-600 line-through opacity-75' : 'text-slate-800 font-medium'}">
+                        ${item.text}
+                    </div>
+                `;
+                resultsEl.appendChild(div);
+            });
+            
+            // Heuristic Analysis (Bonus)
+            // If text contains "API" or "Endpoint", check if we can verify it (Mock for now)
+        }
+
+        function filterFiles() {
+            const term = document.getElementById('file-search').value.toLowerCase();
+            const items = document.querySelectorAll('#file-list > div');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(term) ? 'flex' : 'none';
+            });
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('file-search').addEventListener('input', filterFiles);
+        
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

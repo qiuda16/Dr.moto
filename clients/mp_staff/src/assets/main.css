@@ -1,0 +1,37 @@
+:root {
+  --primary-color: #ff9f0a; /* Technician Orange */
+  --bg-color: #f2f2f7;
+  --card-bg: #ffffff;
+  --text-main: #000000;
+  --text-secondary: #8e8e93;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-container {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: 50px;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 20px 16px 8px;
+  text-transform: uppercase;
+}

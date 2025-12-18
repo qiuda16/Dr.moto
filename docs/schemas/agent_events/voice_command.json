@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Voice Command Event",
+  "description": "Event triggered when a voice command is recognized.",
+  "type": "object",
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "transcript": { "type": "string" },
+    "intent": { "type": "string" },
+    "slots": { "type": "object" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "speaker_id": { "type": "string" }
+  },
+  "required": ["event_id", "timestamp", "transcript"]
+}

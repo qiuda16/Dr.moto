@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Vehicle List View -->
+    <record id="view_drmoto_vehicle_tree" model="ir.ui.view">
+        <field name="name">drmoto.vehicle.list</field>
+        <field name="model">drmoto.vehicle</field>
+        <field name="arch" type="xml">
+            <list string="Vehicles">
+                <field name="make"/>
+                <field name="model"/>
+                <field name="year_from"/>
+                <field name="engine_code"/>
+                <field name="key"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Vehicle Form View -->
+    <record id="view_drmoto_vehicle_form" model="ir.ui.view">
+        <field name="name">drmoto.vehicle.form</field>
+        <field name="model">drmoto.vehicle</field>
+        <field name="arch" type="xml">
+            <form string="Vehicle">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="make"/>
+                            <field name="model"/>
+                            <field name="year_from"/>
+                            <field name="year_to"/>
+                        </group>
+                        <group>
+                            <field name="engine_code"/>
+                            <field name="key"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vehicle Search View -->
+    <record id="view_drmoto_vehicle_search" model="ir.ui.view">
+        <field name="name">drmoto.vehicle.search</field>
+        <field name="model">drmoto.vehicle</field>
+        <field name="arch" type="xml">
+            <search string="Search Vehicles">
+                <field name="make"/>
+                <field name="model"/>
+                <field name="key"/>
+                <group expand="0" string="Group By">
+                    <filter string="Make" name="group_by_make" context="{'group_by': 'make'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_drmoto_vehicle" model="ir.actions.act_window">
+        <field name="name">Vehicles</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">drmoto.vehicle</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new vehicle model
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item -->
+    <menuitem id="menu_drmoto_vehicle"
+              name="Vehicle Models"
+              parent="menu_drmoto_root"
+              action="action_drmoto_vehicle"
+              sequence="20"/>
+
+    <!-- ==================== CUSTOMER VEHICLE (INSTANCE) ==================== -->
+    <record id="view_drmoto_partner_vehicle_tree" model="ir.ui.view">
+        <field name="name">drmoto.partner.vehicle.list</field>
+        <field name="model">drmoto.partner.vehicle</field>
+        <field name="arch" type="xml">
+            <list string="Customer Vehicles">
+                <field name="license_plate"/>
+                <field name="partner_id"/>
+                <field name="vehicle_id"/>
+                <field name="vin"/>
+                <field name="color"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_drmoto_partner_vehicle_form" model="ir.ui.view">
+        <field name="name">drmoto.partner.vehicle.form</field>
+        <field name="model">drmoto.partner.vehicle</field>
+        <field name="arch" type="xml">
+            <form string="Customer Vehicle">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="license_plate"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="vehicle_id"/>
+                        </group>
+                        <group>
+                            <field name="vin"/>
+                            <field name="color"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    
+    <record id="action_drmoto_partner_vehicle" model="ir.actions.act_window">
+        <field name="name">Customer Vehicles</field>
+        <field name="res_model">drmoto.partner.vehicle</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    
+    <!-- Menu moved to library_views.xml to be under Customer Library -->
+
+</odoo>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ==================== CUSTOMER LIBRARY ROOT ==================== -->
+    <menuitem id="menu_drmoto_customer_root"
+              name="Customer Library"
+              parent="menu_drmoto_root"
+              sequence="25"/>
+
+    <!-- 1. Customers List -->
+    <record id="action_drmoto_customer_library" model="ir.actions.act_window">
+        <field name="name">My Customer Library</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="context">{'search_default_customer': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new customer in your library
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_drmoto_customer_library"
+              name="Customers"
+              parent="menu_drmoto_customer_root"
+              action="action_drmoto_customer_library"
+              sequence="10"/>
+
+    <!-- 2. Customer Vehicles (Moved from vehicle_views) -->
+    <menuitem id="menu_drmoto_partner_vehicle"
+              name="Customer Vehicles"
+              parent="menu_drmoto_customer_root"
+              action="action_drmoto_partner_vehicle"
+              sequence="20"/>
+
+    <!-- ==================== PRICING LIBRARY ==================== -->
+    <menuitem id="menu_drmoto_pricing_root"
+              name="Pricing Library"
+              parent="menu_drmoto_root"
+              sequence="35"/>
+
+    <!-- 1. Product Prices (Base) -->
+    <record id="action_drmoto_product_library" model="ir.actions.act_window">
+        <field name="name">Products &amp; Prices</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define products and their base prices
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_drmoto_product_library"
+              name="Products List"
+              parent="menu_drmoto_pricing_root"
+              action="action_drmoto_product_library"
+              sequence="10"/>
+
+    <!-- 2. Pricing Strategies (Pricelists) -->
+    <record id="action_drmoto_pricelist_library" model="ir.actions.act_window">
+        <field name="name">Pricing Strategies</field>
+        <field name="res_model">product.pricelist</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create pricing strategies and discount rules
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_drmoto_pricelist_library"
+              name="Strategies &amp; Discounts"
+              parent="menu_drmoto_pricing_root"
+              action="action_drmoto_pricelist_library"
+              sequence="20"/>
+
+</odoo>

@@ -1,0 +1,4 @@
+opencv-python==4.9.0.80
+mediapipe==0.10.9
+requests==2.31.0
+numpy==1.26.3
