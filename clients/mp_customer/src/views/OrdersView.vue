@@ -70,7 +70,7 @@ const goDetail = (o) => router.push(`/orders/${o.bff_uuid || o.id}`)
 .top { display: flex; justify-content: space-between; font-size: 12px; color: #8e8e93; margin-bottom: 10px; }
 .mid h3 { margin: 0 0 5px 0; font-size: 18px; }
 .mid p { margin: 0; color: #8e8e93; font-size: 14px; }
-.bot { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; color: #3e64ff; font-weight: 500; font-size: 14px; text-transform: uppercase; }
+.bot { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--color-primary); font-weight: 500; font-size: 14px; text-transform: uppercase; }
 .price { color: #fff; font-weight: bold; }
 .history { opacity: 0.6; }
 </style>

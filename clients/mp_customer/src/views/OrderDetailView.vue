@@ -30,7 +30,7 @@
 
       <div class="timeline-section">
         <h3 class="section-header">Timeline</h3>
-        <van-steps direction="vertical" :active="activeStep" active-color="#3e64ff" inactive-color="#333">
+        <van-steps direction="vertical" :active="activeStep" active-color="var(--color-primary)" inactive-color="#333">
           <van-step>
             <h3>Received</h3>
             <p>We've got your request</p>
@@ -75,7 +75,7 @@
             <span>Total to pay (v{{ order.data.odoo.quote_version || 1 }})</span>
             <span class="big-price">${{ order.data.odoo.amount_total }}</span>
           </div>
-          <van-button color="#3e64ff" round block @click="confirmQuote">Accept & Start</van-button>
+          <van-button type="primary" round block @click="confirmQuote">Accept & Start</van-button>
         </div>
         
         <div v-if="order.status === 'ready'" class="dock-inner">
@@ -83,7 +83,7 @@
             <span>Amount Due</span>
             <span class="big-price">${{ order.data.odoo.amount_total }}</span>
           </div>
-          <van-button color="#30d158" round block @click="payNow">Pay Now</van-button>
+          <van-button type="primary" round block @click="payNow">Pay Now</van-button>
         </div>
       </div>
     </div>
@@ -178,7 +178,7 @@ const payNow = async () => {
 }
 .status-badge.quoted { background: #ff9f0a; color: black; }
 .status-badge.ready { background: #30d158; color: black; }
-.status-badge.in_progress { background: #3e64ff; }
+.status-badge.in_progress { background: var(--color-primary); }
 
 .info-card { background: #1c1c1e; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
 .row { display: flex; justify-content: space-between; margin-bottom: 10px; }

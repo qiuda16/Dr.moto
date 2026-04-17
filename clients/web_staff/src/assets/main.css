@@ -1,39 +1,83 @@
 :root {
-  --el-color-primary: #3e64ff;
+  --el-color-primary: #2695d6;
+  --el-color-primary-light-3: #52abdf;
+  --el-color-primary-light-5: #7bc0e7;
+  --el-color-primary-light-7: #addaf1;
+  --el-color-primary-light-8: #c9e8f6;
+  --el-color-primary-light-9: #e9f6fc;
+  --el-color-primary-dark-2: #1679b0;
+  --el-color-success: #1f9d62;
+  --el-color-warning: #d98a17;
+  --el-color-danger: #d64545;
+  --app-text: #17324a;
+  --app-subtext: #6a859d;
+  --app-border: #d5e5ef;
+  --app-card: rgba(255, 255, 255, 0.92);
 }
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: #f5f7fa;
-}
-
-.el-menu {
-  border-right: none !important;
-}
-
-.page-header {
-  background: #fff;
-  padding: 0 20px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  z-index: 10;
-  position: relative;
-}
-
-.main-content {
-  padding: 20px;
-  height: calc(100vh - 60px);
-  overflow-y: auto;
+* {
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  color: var(--app-text);
+  background:
+    radial-gradient(circle at top, rgba(38, 149, 214, 0.12), transparent 28%),
+    linear-gradient(180deg, #f4f9fc 0%, #edf4f9 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 .card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background: var(--app-card);
+  border: 1px solid rgba(213, 229, 239, 0.92);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(17, 76, 116, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.pagination-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.el-table {
+  --el-table-border-color: #ddeaf2;
+  --el-table-header-bg-color: #f4f9fc;
+  --el-table-row-hover-bg-color: #eef7fc;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  color: #627086;
+  font-weight: 600;
+}
+
+.el-dialog,
+.el-drawer {
+  --el-border-radius-base: 16px;
+}
+
+.el-button + .el-button {
+  margin-left: 0;
+}
+
+.el-tag {
+  border-radius: 999px;
 }

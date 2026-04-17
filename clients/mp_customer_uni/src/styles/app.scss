@@ -1,0 +1,55 @@
+﻿.page {
+  min-height: 100vh;
+  background: #f6f7fa;
+  color: #1f2937;
+  padding: 20rpx 24rpx 160rpx;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.08);
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin: 12rpx 4rpx 16rpx;
+}
+
+.subtext {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.badge {
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 6rpx 16rpx;
+  background: #ffe9e5;
+  color: #bc2f1f;
+}
+
+.input {
+  width: 100%;
+  background: #f3f4f6;
+  border-radius: 14rpx;
+  padding: 22rpx;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+}
+
+.btn-primary {
+  background: #de3d2b;
+  color: #fff;
+  border-radius: 14rpx;
+  font-size: 30rpx;
+}

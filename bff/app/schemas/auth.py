@@ -7,10 +7,13 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    role: Optional[str] = None
+    email: Optional[str] = None
 
 class User(BaseModel):
     username: str
     email: Optional[str] = None
+    role: str = "staff"
     disabled: Optional[bool] = None
 
 class UserInDB(User):

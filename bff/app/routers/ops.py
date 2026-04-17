@@ -1,21 +1,29 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import base64
 import os
 
 from ..integrations.obj_storage import obj_storage
 from ..schemas.ops import UploadBase64, ReadmeRequest
+from ..core.config import settings
+from ..core.security import require_roles
+from ..schemas.auth import User
 
 router = APIRouter(tags=["Ops"])
 
 @router.post("/media/upload_base64")
-async def upload_base64(payload: UploadBase64):
+async def upload_base64(
+    payload: UploadBase64,
+    current_user: User = Depends(require_roles(["admin", "manager"]))
+):
     data = base64.b64decode(payload.content_base64)
     url = obj_storage.put_bytes(payload.filename, data, content_type=payload.content_type)
     return {"key": payload.filename, "url": url}
 
 @router.get("/ops/readmes")
-async def list_readmes():
+async def list_readmes(current_user: User = Depends(require_roles(["admin"]))):
     """Scan the project for README files."""
+    if not settings.ENABLE_DEV_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Endpoint disabled")
     project_root = "/app" # Docker path
     readmes = []
     for root, dirs, files in os.walk(project_root):
@@ -31,8 +39,13 @@ async def list_readmes():
     return readmes
 
 @router.post("/ops/readme/content")
-async def get_readme_content(payload: ReadmeRequest):
+async def get_readme_content(
+    payload: ReadmeRequest,
+    current_user: User = Depends(require_roles(["admin"]))
+):
     """Read content of a specific README file."""
+    if not settings.ENABLE_DEV_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Endpoint disabled")
     # Security check: simple path traversal prevention
     if ".." in payload.path or payload.path.startswith("/"):
          raise HTTPException(status_code=400, detail="Invalid path")

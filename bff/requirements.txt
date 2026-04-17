@@ -6,6 +6,7 @@ pydantic==2.6.0
 pydantic-settings==2.1.0
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
+pymysql==1.1.1
 python-multipart==0.0.7
 minio==7.2.5
 python-jose[cryptography]==3.3.0
@@ -13,3 +14,6 @@ passlib[argon2]==1.7.4
 argon2-cffi==23.1.0
 pytest==8.0.0
 httpx==0.26.0
+prometheus-client==0.20.0
+reportlab==4.0.9
+pypdf==4.2.0

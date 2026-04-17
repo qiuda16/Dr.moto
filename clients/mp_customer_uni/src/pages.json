@@ -1,0 +1,88 @@
+﻿﻿﻿﻿{
+  "pages": [
+    {
+      "path": "pages/dashboard/index",
+      "style": {
+        "navigationBarTitleText": "首页",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/health/index",
+      "style": {
+        "navigationBarTitleText": "体检",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/maintenance/index",
+      "style": {
+        "navigationBarTitleText": "保养",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "subpages",
+      "pages": [
+        {
+          "path": "auth/login",
+          "style": {
+            "navigationBarTitleText": "登录"
+          }
+        },
+        {
+          "path": "recommendations/index",
+          "style": {
+            "navigationBarTitleText": "推荐",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
+          "path": "knowledge/index",
+          "style": {
+            "navigationBarTitleText": "科普",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
+          "path": "privacy/index",
+          "style": {
+            "navigationBarTitleText": "隐私政策"
+          }
+        },
+        {
+          "path": "agreement/index",
+          "style": {
+            "navigationBarTitleText": "用户协议"
+          }
+        }
+      ]
+    }
+  ],
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#de3d2b",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/dashboard/index", "text": "首页" },
+      { "pagePath": "pages/health/index", "text": "体检" },
+      { "pagePath": "pages/maintenance/index", "text": "保养" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "车主服务",
+    "navigationBarBackgroundColor": "#f7f8fa",
+    "backgroundColor": "#f7f8fa"
+  }
+}

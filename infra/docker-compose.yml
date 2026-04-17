@@ -1,8 +1,7 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-odoo}
@@ -11,11 +10,22 @@ services:
     volumes:
       - odoo_db_data:/var/lib/postgresql/data
       - ./init-sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - drmoto-net
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - drmoto-net
 
@@ -23,6 +33,7 @@ services:
     image: ${ODOO_IMAGE:-odoo:18.0}
     depends_on:
       - db
+    restart: unless-stopped
     ports:
       - "8069:8069"
     volumes:
@@ -32,6 +43,11 @@ services:
       - HOST=db
       - USER=${POSTGRES_USER:-odoo}
       - PASSWORD=${POSTGRES_PASSWORD:-odoo}
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8069/web', timeout=5)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 10
     networks:
       - drmoto-net
 
@@ -39,29 +55,86 @@ services:
     build:
       context: ../bff
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       - odoo
       - redis
       - db
     ports:
-      - "8080:8080"
+      - "18080:8080"
     environment:
       - ODOO_URL=http://odoo:8069
       - ODOO_DB=${POSTGRES_DB:-odoo}
-      - ODOO_USER=${ODOO_USER:-odoo}
-      - ODOO_PASSWORD=${ODOO_PASSWORD:-odoo}
+      - ODOO_USER=${ODOO_USER:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - PYTHONUTF8=1
+      - PYTHONIOENCODING=UTF-8
+      - ODOO_TIMEOUT_SECONDS=${BFF_ODOO_TIMEOUT_SECONDS:-10}
+      - ODOO_RETRY_MAX_ATTEMPTS=${BFF_ODOO_RETRY_MAX_ATTEMPTS:-3}
+      - ODOO_RETRY_BACKOFF_SECONDS=${BFF_ODOO_RETRY_BACKOFF_SECONDS:-0.5}
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-odoo}:${POSTGRES_PASSWORD:-odoo}@db:5432/bff
+      - DATABASE_URL=${BFF_DATABASE_URL:-postgresql://${POSTGRES_USER:-odoo}:${POSTGRES_PASSWORD:-odoo}@db:5432/bff}
+      - DB_POOL_SIZE=${BFF_DB_POOL_SIZE:-10}
+      - DB_MAX_OVERFLOW=${BFF_DB_MAX_OVERFLOW:-20}
+      - DB_POOL_TIMEOUT_SECONDS=${BFF_DB_POOL_TIMEOUT_SECONDS:-30}
+      - DB_POOL_RECYCLE_SECONDS=${BFF_DB_POOL_RECYCLE_SECONDS:-1800}
+      - DB_POOL_PRE_PING=${BFF_DB_POOL_PRE_PING:-true}
+      - DB_AUTO_CREATE_TABLES=${BFF_DB_AUTO_CREATE_TABLES:-true}
+      - MIGRATIONS_DIR=${BFF_MIGRATIONS_DIR:-migrations/versions}
+      - AUTO_APPLY_MIGRATIONS=${BFF_AUTO_APPLY_MIGRATIONS:-true}
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minio}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minio123456}
       - MINIO_BUCKET=${MINIO_BUCKET:-drmoto}
+      - AI_URL=http://ai:8000
+      - OCR_REQUEST_TIMEOUT_SECONDS=${BFF_OCR_REQUEST_TIMEOUT_SECONDS:-1800}
+      - ENV=${BFF_ENV:-dev}
+      - LOG_LEVEL=${BFF_LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${BFF_LOG_FORMAT:-json}
+      - ENABLE_METRICS=${BFF_ENABLE_METRICS:-true}
+      - METRICS_PATH=${BFF_METRICS_PATH:-/metrics}
+      - DEFAULT_STORE_ID=${BFF_DEFAULT_STORE_ID:-default}
+      - CORS_ORIGINS=${BFF_CORS_ORIGINS:-*}
+      - ENABLE_DEV_ENDPOINTS=${BFF_ENABLE_DEV_ENDPOINTS:-true}
+      - ENABLE_MOCK_PAYMENT=${BFF_ENABLE_MOCK_PAYMENT:-true}
+      - PAYMENT_PROVIDER=${BFF_PAYMENT_PROVIDER:-mock}
+      - PAYMENT_WEBHOOK_SECRET=${BFF_PAYMENT_WEBHOOK_SECRET:-}
+      - WECHAT_MCH_ID=${BFF_WECHAT_MCH_ID:-}
+      - WECHAT_APP_ID=${BFF_WECHAT_APP_ID:-}
+      - WECHAT_API_V3_KEY=${BFF_WECHAT_API_V3_KEY:-}
+      - WECHAT_CERT_SERIAL_NO=${BFF_WECHAT_CERT_SERIAL_NO:-}
+      - WECHAT_MCH_PRIVATE_KEY_PEM=${BFF_WECHAT_MCH_PRIVATE_KEY_PEM:-}
+      - WECHAT_MCH_PRIVATE_KEY_PATH=${BFF_WECHAT_MCH_PRIVATE_KEY_PATH:-}
+      - WECHAT_NOTIFY_URL=${BFF_WECHAT_NOTIFY_URL:-}
+      - WECHAT_API_BASE=${BFF_WECHAT_API_BASE:-https://api.mch.weixin.qq.com}
+      - WECHAT_TIMEOUT_SECONDS=${BFF_WECHAT_TIMEOUT_SECONDS:-10}
+      - WECHAT_PLATFORM_CERT_SERIAL_NO=${BFF_WECHAT_PLATFORM_CERT_SERIAL_NO:-}
+      - WECHAT_PLATFORM_PUBLIC_KEY_PEM=${BFF_WECHAT_PLATFORM_PUBLIC_KEY_PEM:-}
+      - WECHAT_PLATFORM_PUBLIC_KEY_PATH=${BFF_WECHAT_PLATFORM_PUBLIC_KEY_PATH:-}
+      - SECRET_KEY=${BFF_SECRET_KEY:-your-secret-key-change-me-in-production}
+      - ADMIN_USERNAME=${BFF_ADMIN_USERNAME:-admin}
+      - ADMIN_EMAIL=${BFF_ADMIN_EMAIL:-admin@drmoto.local}
+      - ADMIN_ROLE=${BFF_ADMIN_ROLE:-admin}
+      - ADMIN_PASSWORD=${BFF_ADMIN_PASSWORD:-change_me_now}
+      - ADMIN_PASSWORD_HASH=${BFF_ADMIN_PASSWORD_HASH:-}
+      - WEBHOOK_SHARED_SECRET=${BFF_WEBHOOK_SHARED_SECRET:-}
+      - LOGIN_RATE_LIMIT_MAX_ATTEMPTS=${BFF_LOGIN_RATE_LIMIT_MAX_ATTEMPTS:-10}
+      - LOGIN_RATE_LIMIT_WINDOW_SECONDS=${BFF_LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
+      - STRICT_STARTUP_VALIDATION=${BFF_STRICT_STARTUP_VALIDATION:-true}
     volumes:
       - ../bff/app:/app/app
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 8
     networks:
       - drmoto-net
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
@@ -78,13 +151,72 @@ services:
     build:
       context: ../ai
       dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - ocr_vl
     ports:
       - "8001:8000"
     environment:
       - BFF_URL=http://bff:8080
+      - BFF_INTERNAL_SECRET=${BFF_WEBHOOK_SHARED_SECRET:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_LLM_PROVIDER=${AI_LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:8b}
+      - OLLAMA_FALLBACK_MODEL=${OLLAMA_FALLBACK_MODEL:-qwen3:4b}
+      - OLLAMA_CONTEXT_WINDOW=${OLLAMA_CONTEXT_WINDOW:-40960}
+      - OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS:-120}
+      - AI_CHAT_HISTORY_LIMIT=${AI_CHAT_HISTORY_LIMIT:-16}
+      - AI_CONTEXT_PAYLOAD_MAX_CHARS=${AI_CONTEXT_PAYLOAD_MAX_CHARS:-16000}
+      - AI_MEMORY_BACKEND=${AI_MEMORY_BACKEND:-redis}
+      - AI_MEMORY_REDIS_URL=${AI_MEMORY_REDIS_URL:-redis://redis:6379/1}
+      - AI_MEMORY_KEEP_RECENT_TURNS=${AI_MEMORY_KEEP_RECENT_TURNS:-12}
+      - AI_KB_COLLECTION_NAME=${AI_KB_COLLECTION_NAME:-real_manual_test}
+      - OCR_PROVIDER=${AI_OCR_PROVIDER:-auto}
+      - OCR_SERVICE_URL=http://ocr_vl:8080
+      - OCR_SERVICE_TIMEOUT_SECONDS=${AI_OCR_SERVICE_TIMEOUT_SECONDS:-1800}
+      - OCR_PDF_BATCH_PAGES=${AI_OCR_PDF_BATCH_PAGES:-4}
+      - OCR_LLM_CLASSIFIER_ENABLED=${AI_OCR_LLM_CLASSIFIER_ENABLED:-true}
+      - OCR_LLM_PROVIDER=${AI_OCR_LLM_PROVIDER:-ollama}
+      - OCR_LLM_API_URL=${AI_OCR_LLM_API_URL:-http://host.docker.internal:11434}
+      - OCR_LLM_MODEL=${AI_OCR_LLM_MODEL:-qwen3:4b}
+      - OCR_LLM_API_KEY=${AI_OCR_LLM_API_KEY:-}
+      - OCR_LLM_TIMEOUT_SECONDS=${AI_OCR_LLM_TIMEOUT_SECONDS:-120}
     volumes:
       - ../ai/app:/app/app
+      - ../ai/data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - drmoto-net
+
+  ocr_vl:
+    image: ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-vl:latest-nvidia-gpu
+    restart: unless-stopped
+    user: "0:0"
+    command: ["paddlex", "--pipeline", "PaddleOCR-VL", "--serve", "--device", "gpu:0", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - PYTHONUTF8=1
+      - PYTHONIOENCODING=UTF-8
+    ports:
+      - "18118:8080"
+    gpus: all
+    volumes:
+      - paddlex_model_cache:/home/paddleocr/.paddlex
+    networks:
+      - drmoto-net
+
+  db-ui:
+    image: adminer
+    restart: always
+    ports:
+      - "8082:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+      - ADMINER_DESIGN=pappu687
     networks:
       - drmoto-net
 
@@ -92,6 +224,7 @@ volumes:
   odoo_web_data:
   odoo_db_data:
   minio_data:
+  paddlex_model_cache:
 
 networks:
   drmoto-net:

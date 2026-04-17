@@ -1,0 +1,1 @@
+curl -X POST http://localhost:8002/ai/kb/ask -H "Content-Type: application/json" -d "{\"question\": \"如何换机油\", \"collection\": \"real_manual_test\"}" > curl_output.txt 2>&1

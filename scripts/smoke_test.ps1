@@ -1,62 +1,78 @@
+param(
+    [string]$BaseUrl = "http://localhost:8080",
+    [string]$Username = "admin",
+    [string]$Password = "change_me_now",
+    [string]$StoreId = "default"
+)
+
 $ErrorActionPreference = "Stop"
-$BFF_BASE = "http://localhost:8080"
 
-Write-Host "[SMOKE] Checking BFF Health at $BFF_BASE/health ..." -ForegroundColor Cyan
-
-try {
-    $response = Invoke-RestMethod -Uri "$BFF_BASE/health" -Method Get
-    Write-Host "[OK] BFF is Online:" -ForegroundColor Green
-    Write-Host ($response | ConvertTo-Json)
-} catch {
-    Write-Host "[FAIL] Could not connect to BFF. Is Docker running?" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    exit 1
+Write-Host "[1/5] Health check..." -ForegroundColor Cyan
+$health = Invoke-RestMethod -Uri "$BaseUrl/health" -Method Get
+$health | ConvertTo-Json -Depth 6 | Write-Host
+if ($health.status -ne "ok") {
+    throw "Health is not ok."
 }
 
-Write-Host "`n[SMOKE] Creating Test Work Order..." -ForegroundColor Cyan
-try {
-    $body = @{
-        customer_id = "smoke_test"
-        vehicle_plate = "TEST001"
-        description = "Smoke Test Auto"
-    } | ConvertTo-Json
-
-    $wo = Invoke-RestMethod -Uri "$BFF_BASE/mp/workorders/create" -Method Post -Body $body -ContentType "application/json"
-    Write-Host "[OK] Work Order Created:" -ForegroundColor Green
-    Write-Host ($wo | ConvertTo-Json)
-    
-    $woId = $wo.id
-    
-    Write-Host "`n[SMOKE] Retrieving Work Order $woId..." -ForegroundColor Cyan
-    $getWo = Invoke-RestMethod -Uri "$BFF_BASE/mp/workorders/$woId" -Method Get
-    Write-Host "[OK] Work Order Retrieved" -ForegroundColor Green
-
-    Write-Host "`n[SMOKE] Recording Payment for Work Order $woId..." -ForegroundColor Cyan
-    $payBody = @{
-        work_order_id = $woId
-        amount = 100.00
-        transaction_id = "txn_$(Get-Random)"
-    } | ConvertTo-Json
-    
-    $pay = Invoke-RestMethod -Uri "$BFF_BASE/mp/payments/record" -Method Post -Body $payBody -ContentType "application/json"
-    Write-Host "[OK] Payment Recorded:" -ForegroundColor Green
-    Write-Host ($pay | ConvertTo-Json)
-
-    Write-Host "`n[SMOKE] Uploading Media to Object Storage..." -ForegroundColor Cyan
-    $content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("hello drmoto"))
-    $uploadBody = @{
-        filename = "smoke_$(Get-Random).txt"
-        content_base64 = $content
-        content_type = "text/plain"
-    } | ConvertTo-Json
-    $upload = Invoke-RestMethod -Uri "$BFF_BASE/media/upload_base64" -Method Post -Body $uploadBody -ContentType "application/json"
-    Write-Host "[OK] Media Uploaded:" -ForegroundColor Green
-    Write-Host ($upload | ConvertTo-Json)
-
-} catch {
-    Write-Host "[FAIL] Work Order flow failed" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    exit 1
+Write-Host "[2/5] Login..." -ForegroundColor Cyan
+$tokenResp = Invoke-RestMethod -Uri "$BaseUrl/auth/token" -Method Post -ContentType "application/x-www-form-urlencoded" -Body "username=$Username&password=$Password"
+$token = $tokenResp.access_token
+if (-not $token) { throw "Login failed." }
+$headers = @{
+    Authorization = "Bearer $token"
+    "X-Store-Id" = $StoreId
 }
 
-Write-Host "`n[SMOKE] All Checks Passed" -ForegroundColor Green
+Write-Host "[3/5] Create customer..." -ForegroundColor Cyan
+$customer = Invoke-RestMethod -Uri "$BaseUrl/mp/workorders/customers" -Method Post -Headers $headers -ContentType "application/json" -Body (@{
+    name = "Smoke Customer"
+    phone = "13900000000"
+    email = "smoke@example.com"
+} | ConvertTo-Json)
+
+Write-Host "[4/5] Create work order..." -ForegroundColor Cyan
+$wo = Invoke-RestMethod -Uri "$BaseUrl/mp/workorders/" -Method Post -Headers $headers -ContentType "application/json" -Body (@{
+    customer_id = "$($customer.id)"
+    vehicle_plate = "SMOKE001"
+    description = "Smoke test order"
+} | ConvertTo-Json)
+
+Write-Host "[5/5] Render document..." -ForegroundColor Cyan
+$docResp = Invoke-WebRequest -Uri "$BaseUrl/mp/workorders/$($wo.id)/documents/work-order" -Method Get -Headers $headers
+if ($docResp.StatusCode -ne 200) {
+    throw "Document endpoint failed."
+}
+
+$actionsResp = Invoke-RestMethod -Uri "$BaseUrl/mp/workorders/$($wo.id)/actions" -Method Get -Headers $headers
+if (-not $actionsResp.actions) {
+    throw "Action endpoint failed."
+}
+
+$quote = Invoke-RestMethod -Uri "$BaseUrl/mp/quotes/$($wo.id)/versions" -Method Post -Headers $headers -ContentType "application/json" -Body (@{
+    items = @(
+        @{ item_type = "part"; code = "P-001"; name = "Brake Pad"; qty = 2; unit_price = 120 },
+        @{ item_type = "service"; code = "L-001"; name = "Labor"; qty = 1; unit_price = 180 }
+    )
+} | ConvertTo-Json -Depth 6)
+if ($quote.version -ne 1) {
+    throw "Quote create failed."
+}
+
+$published = Invoke-RestMethod -Uri "$BaseUrl/mp/quotes/$($wo.id)/1/publish" -Method Post -Headers $headers
+if ($published.status -ne "published") {
+    throw "Quote publish failed."
+}
+
+$listPageUrl = "{0}/mp/workorders/list/page?page=1&size=10" -f $BaseUrl
+$listPage = Invoke-RestMethod -Uri $listPageUrl -Method Get -Headers $headers
+if (-not $listPage.items) {
+    throw "Work order page endpoint failed."
+}
+
+$summary = Invoke-RestMethod -Uri "$BaseUrl/mp/dashboard/summary" -Method Get -Headers $headers
+if (-not $summary.orders) {
+    throw "Dashboard summary endpoint failed."
+}
+
+Write-Host "Smoke test passed." -ForegroundColor Green
+Write-Host ("Work order id: " + $wo.id)

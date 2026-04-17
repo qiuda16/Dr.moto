@@ -1,62 +1,45 @@
-# RBAC Matrix (MVP)
+# RBAC Matrix (Operational Baseline)
 
-> Date: 2025-12-17  
-> Principle: server-side enforcement (BFF/Odoo). UI gating is not sufficient.
+Updated: 2026-03-29
+
+This matrix is the backend enforcement contract for the current BFF + Odoo deployment.
 
 ## Roles
-- OWNER (store owner / manager)
-- ADVISOR (front desk)
-- TECH (technician)
-- KEEPER (warehouse keeper)
-- CASHIER (cashier)
-- ADMIN (system admin)
-- CUSTOMER (wechat user)
 
-## Data Scope
-- Default: staff can only access `shop_id` they belong to.
-- CUSTOMER can only access their own records (ownership by `customer_id`).
+- `admin`: platform administrator, full access.
+- `manager`: store manager.
+- `staff`: front desk / advisor / technician mixed role (phase-1 simplification).
+- `keeper`: inventory and warehouse operator.
+- `cashier`: payment and closing operator.
 
-## Action Catalog (stable IDs)
-Use these IDs in code (policy checks, audit logs, tests):
+## Data Scope Rules
 
-### Work Order
-- `WO_CREATE`, `WO_VIEW`, `WO_UPDATE_BASIC`, `WO_STATUS_TRANSITION`, `WO_CANCEL`
+- All staff roles are store-internal only.
+- Future customer-facing access must be isolated by customer ownership (`customer_id`) and should not reuse staff tokens.
 
-### Quote / Pricing
-- `QUOTE_CREATE_VERSION`, `QUOTE_EDIT_DRAFT`, `QUOTE_REQUEST_CONFIRM`, `QUOTE_OVERRIDE_AFTER_CONFIRM`, `DISCOUNT_APPLY`
+## Endpoint Policy
 
-### Inventory
-- `INV_REQUEST_ISSUE`, `INV_POST_ISSUE`, `INV_POST_RETURN`, `INV_REVERSE`
+| Area | Endpoint | Allowed Roles |
+|---|---|---|
+| Auth | `POST /auth/token` | Public |
+| Work order | `POST /mp/workorders/` | `admin`, `manager`, `staff` |
+| Work order | `GET /mp/workorders/{id}` | `admin`, `manager`, `staff`, `cashier`, `keeper` |
+| Work order | `GET /mp/workorders/search` | `admin`, `manager`, `staff`, `cashier`, `keeper` |
+| Work order | `POST /mp/workorders/{id}/status` | `admin`, `manager`, `staff` |
+| Work order | `POST /mp/workorders/customers` | `admin`, `manager`, `staff` |
+| Work order | `GET /mp/workorders/customers/search` | `admin`, `manager`, `staff` |
+| Work order | `GET /mp/workorders/customers/{partner_id}/vehicles` | `admin`, `manager`, `staff` |
+| Work order | `GET /mp/workorders/customers/{partner_id}/orders` | `admin`, `manager`, `staff` |
+| Work order | `GET /mp/workorders/{id}/documents/{doc_type}` | `admin`, `manager`, `staff`, `cashier`, `keeper` |
+| Inventory | `POST /mp/inventory/issue` | `admin`, `manager`, `keeper` |
+| Inventory | `GET /mp/inventory/products` | `admin`, `manager`, `keeper`, `staff` |
+| Payments | `POST /mp/payments/create_intent` | `admin`, `manager`, `cashier`, `staff` |
+| Payments | `POST /mp/payments/record` | `admin`, `manager`, `cashier` |
+| Events | `/mp/events/*` | `admin`, `manager` |
+| Ops | `/media/*`, `/ops/*` | restricted admin/manager only |
 
-### Payment
-- `PAY_CREATE_ORDER`, `PAY_RECORD_OFFLINE`, `PAY_REFUND`, `WO_CLOSE`
+## Notes
 
-### Admin / Master Data
-- `USER_ROLE_MANAGE`
-
-## Matrix
-Legend: ✅ allowed, ❌ denied, 🔒 requires approval (OWNER/ADMIN), ℹ️ read-only
-
-| Action | OWNER | ADVISOR | TECH | KEEPER | CASHIER | ADMIN | CUSTOMER |
-|---|---|---|---|---|---|---|---|
-| WO_CREATE | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| WO_VIEW | ✅ | ✅ | ✅ (assigned) | ✅ (inv-related) | ✅ | ✅ | ✅ (own) |
-| WO_UPDATE_BASIC | ✅ | ✅ | ✅ (notes only) | ❌ | ❌ | ✅ | ❌ |
-| WO_STATUS_TRANSITION | ✅ | ✅ | ✅ (IN_PROGRESS/READY) | ❌ | ❌ | ✅ | ❌ |
-| WO_CANCEL | ✅ | 🔒 | ❌ | ❌ | ❌ | ✅ | ❌ |
-| QUOTE_CREATE_VERSION | ✅ | ✅ | 🔒 (suggest only) | ❌ | ❌ | ✅ | ❌ |
-| QUOTE_EDIT_DRAFT | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| QUOTE_OVERRIDE_AFTER_CONFIRM | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| INV_REQUEST_ISSUE | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| INV_POST_ISSUE | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| INV_POST_RETURN | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| INV_REVERSE | ✅ | ❌ | ❌ | 🔒 | ❌ | ✅ | ❌ |
-| PAY_CREATE_ORDER | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| PAY_RECORD_OFFLINE | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| PAY_REFUND | ✅ | ❌ | ❌ | ❌ | 🔒 | ✅ | ❌ |
-| WO_CLOSE | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| USER_ROLE_MANAGE | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-
-## Enforcement Notes
-- Any 🔒 action MUST create an `audit_log` entry including reason and before/after summary.
-- TECH must not post inventory or payments.
+- `staff` is intentionally broad for phase-1 go-live. Split into dedicated advisor/technician roles in phase-2.
+- Any override or cancellation action should always emit audit logs.
+- No endpoint should rely on frontend visibility for security; always enforce role checks in backend dependencies.

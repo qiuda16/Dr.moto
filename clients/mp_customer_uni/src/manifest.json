@@ -1,0 +1,19 @@
+﻿{
+    "name":  "车主小程序",
+    "appid":  "wx0bfeb41d1fdc1999",
+    "description":  "DrMoto 车主小程序（长期标准方案）",
+    "versionName":  "0.1.0",
+    "versionCode":  "100",
+    "transformPx":  false,
+    "mp-weixin":  {
+                      "appid":  "wx0bfeb41d1fdc1999",
+                      "setting":  {
+                                      "urlCheck":  true,
+                                      "es6":  true,
+                                      "postcss":  true,
+                                      "minified":  true
+                                  },
+                      "usingComponents":  true
+                  },
+    "vueVersion":  "3"
+}

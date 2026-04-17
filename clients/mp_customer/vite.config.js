@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_BFF_URL || 'http://localhost:18080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }

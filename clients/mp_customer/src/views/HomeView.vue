@@ -119,7 +119,7 @@
           </div>
 
           <div class="submit-area">
-            <van-button round block color="#3e64ff" native-type="submit">
+            <van-button round block type="primary" native-type="submit">
               Schedule Service
             </van-button>
           </div>
@@ -201,7 +201,7 @@ const getProgressWidth = (state) => {
   padding: 20px;
 }
 .name { font-size: 18px; font-weight: 600; color: #fff; }
-.icon-btn { font-size: 24px; color: #fff; margin-left: 20px; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 50%; }
+.icon-btn { font-size: 24px; color: #fff; margin-left: 20px; background: rgba(255,255,255,0.1); width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
 
 .vehicle-hero {
   text-align: center; margin-bottom: 30px; position: relative;
@@ -222,25 +222,25 @@ const getProgressWidth = (state) => {
 .control-row { display: flex; justify-content: space-around; }
 .control-btn { display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; }
 .icon-circle {
-  width: 56px; height: 56px; border-radius: 50%; background: #1c1c1e;
+  width: 64px; height: 64px; border-radius: 8px; background: #1c1c1e;
   display: flex; justify-content: center; align-items: center; font-size: 24px; color: #fff;
-  transition: all 0.2s; border: 1px solid rgba(255,255,255,0.1);
+  transition: transform var(--motion-transform) var(--motion-curve); border: 1px solid rgba(255,255,255,0.1);
 }
 .control-btn:active .icon-circle { transform: scale(0.95); background: #333; }
-.control-btn span { font-size: 12px; color: #8e8e93; }
+.control-btn span { font-size: var(--font-caption); color: #8e8e93; }
 
 .service-status-card {
   margin: 0 20px 30px; background: #1c1c1e; border-radius: 12px; overflow: hidden;
   border: 1px solid rgba(255,255,255,0.1);
 }
 .progress-bar { height: 4px; background: #333; width: 100%; }
-.fill { height: 100%; background: #3e64ff; transition: width 0.5s; }
+.fill { height: 100%; background: var(--color-primary); transition: width 0.5s; }
 .status-content { padding: 15px; display: flex; justify-content: space-between; align-items: center; }
 .left { display: flex; flex-direction: column; }
 .left .label { font-size: 12px; color: #8e8e93; }
 .left .value { font-size: 16px; font-weight: 600; margin-top: 4px; }
 .right { color: #8e8e93; display: flex; align-items: center; gap: 5px; font-size: 14px; }
-.state-text { color: #3e64ff; font-weight: 500; text-transform: uppercase; }
+.state-text { color: var(--color-primary); font-weight: 500; text-transform: uppercase; }
 
 .info-section { padding: 0 20px; }
 .menu-item {

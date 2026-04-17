@@ -17,6 +17,7 @@ Handles:
     'data': [
         'security/ir.model.access.csv',
         'data/sequence.xml',
+        'views/menu_root.xml',
         'views/work_order_views.xml',
         'views/vehicle_views.xml',
         'views/procedure_views.xml',

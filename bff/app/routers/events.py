@@ -7,6 +7,8 @@ from ..core.db import get_db
 from ..models import EventLog
 from ..schemas.event import EventIngest, EventResponse
 from ..integrations.mq import event_bus
+from ..core.security import require_roles
+from ..schemas.auth import User
 
 router = APIRouter(prefix="/events", tags=["Edge Events"])
 logger = logging.getLogger("bff")
@@ -15,7 +17,8 @@ logger = logging.getLogger("bff")
 async def ingest_event(
     event: EventIngest, 
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "manager"]))
 ):
     try:
         # 1. Log to DB
@@ -23,7 +26,7 @@ async def ingest_event(
             event_id=event.event_id,
             event_type=event.event_type,
             source=event.source,
-            payload=json.dumps(event.payload)
+            payload=json.dumps(event.payload, ensure_ascii=False)
         )
         db.add(db_event)
         db.commit()
@@ -43,7 +46,11 @@ async def ingest_event(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=list)
-async def get_recent_events(limit: int = 10, db: Session = Depends(get_db)):
+async def get_recent_events(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "manager"]))
+):
     events = db.query(EventLog).order_by(EventLog.created_at.desc()).limit(limit).all()
     return [
         {

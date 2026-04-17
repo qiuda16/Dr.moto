@@ -58,9 +58,7 @@ const updateTime = () => {
 
 const fetchOrders = async () => {
   try {
-    // We reuse the active list endpoint from BFF
-    // In prod, this should use a specific public/display endpoint
-    const res = await axios.get('/api/mp/workorders/active/list')
+    const res = await axios.get('/api/mp/workorders/display/list')
     orders.value = res.data
   } catch (e) {
     console.error("Fetch failed", e)

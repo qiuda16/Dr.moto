@@ -1,59 +1,50 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
-import logging
-import uuid
+import shutil
+import os
+from ..core.ingest import ingest_pdf
+from ..core.rag import query_kb
 
-router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
-logger = logging.getLogger("ai")
+router = APIRouter(
+    prefix="/ai/kb",
+    tags=["knowledge-base"]
+)
 
-class SearchRequest(BaseModel):
-    query: str
-    limit: int = 3
-
-class SearchResult(BaseModel):
-    doc_id: str
-    content: str
-    score: float
-
-# Mock Vector Store
-MOCK_VECTORS = {
-    "manual_v1": "To replace the battery, unscrew the back panel (Philips #2) and disconnect the terminal.",
-    "manual_v2": "Safety First: Always wear gloves when handling the engine block.",
-    "manual_v3": "Torque settings for wheel nuts: 120Nm."
-}
+class QueryRequest(BaseModel):
+    question: str
+    collection: str = "manuals"
 
 @router.post("/ingest")
-async def ingest_document(file: UploadFile = File(...)):
+async def upload_manual(file: UploadFile = File(...)):
     """
-    Ingest a PDF/Text file into the Vector DB.
-    (Mock implementation)
+    Upload a PDF Manual to ingest into the Knowledge Base.
     """
-    content = await file.read()
-    doc_id = str(uuid.uuid4())
-    logger.info(f"Ingested document {file.filename} as {doc_id}")
-    return {"status": "ingested", "doc_id": doc_id, "chunks": 1}
-
-@router.post("/search", response_model=List[SearchResult])
-async def search_kb(req: SearchRequest):
-    """
-    Semantic Search.
-    (Mock: keyword matching)
-    """
-    results = []
-    q = req.query.lower()
-    
-    for doc_id, text in MOCK_VECTORS.items():
-        score = 0.0
-        if q in text.lower():
-            score = 0.9
-        else:
-            # Simple word overlap
-            common = set(q.split()) & set(text.lower().split())
-            if common:
-                score = 0.1 * len(common)
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files allowed")
         
-        if score > 0:
-            results.append(SearchResult(doc_id=doc_id, content=text, score=score))
-            
-    return sorted(results, key=lambda x: x.score, reverse=True)[:req.limit]
+    temp_file = f"temp_{file.filename}"
+    with open(temp_file, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    try:
+        count = ingest_pdf(temp_file)
+        return {"status": "success", "chunks_added": count, "filename": file.filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+@router.post("/ask")
+async def ask_question(req: QueryRequest):
+    """
+    Ask a question to the Knowledge Base.
+    """
+    try:
+        result = query_kb(req.question, req.collection)
+        return result
+    except Exception as e:
+        # In case of OpenAI errors (e.g. missing key), return a friendly error
+        if "api_key" in str(e).lower():
+             raise HTTPException(status_code=500, detail="OpenAI API Key missing. Please configure OPENAI_API_KEY env.")
+        raise HTTPException(status_code=500, detail=str(e))

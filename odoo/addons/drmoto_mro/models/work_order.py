@@ -1,4 +1,5 @@
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 import requests
 import logging
 
@@ -53,6 +54,17 @@ class DrMotoWorkOrder(models.Model):
     # Procedure Integration
     procedure_id = fields.Many2one('drmoto.procedure', string='Standard Procedure')
 
+    _allowed_state_transitions = {
+        'draft': {'confirmed', 'cancel'},
+        'confirmed': {'diagnosing', 'cancel'},
+        'diagnosing': {'quoted', 'cancel'},
+        'quoted': {'in_progress', 'cancel'},
+        'in_progress': {'ready', 'done', 'cancel'},
+        'ready': {'done', 'cancel'},
+        'done': set(),
+        'cancel': {'draft'},
+    }
+
     @api.onchange('procedure_id')
     def _onchange_procedure_id(self):
         """Auto-populate lines when a procedure is selected."""
@@ -95,6 +107,37 @@ class DrMotoWorkOrder(models.Model):
             requests.post(bff_url, json=payload, timeout=2)
         except Exception as e:
             _logger.error(f"Failed to sync status to BFF: {e}")
+
+    def _transition_to(self, target_state):
+        for order in self:
+            current = order.state or 'draft'
+            allowed = self._allowed_state_transitions.get(current, set())
+            if target_state not in allowed and current != target_state:
+                raise UserError(f"Invalid state transition: {current} -> {target_state}")
+        self.write({'state': target_state})
+        return True
+
+    def action_confirm(self):
+        return self._transition_to('confirmed')
+
+    def action_start_diagnosis(self):
+        return self._transition_to('diagnosing')
+
+    def action_quote(self):
+        return self._transition_to('quoted')
+
+    def action_start_work(self):
+        return self._transition_to('in_progress')
+
+    def action_finish(self):
+        # Move to done directly for now; can split ready/done in next iteration.
+        return self._transition_to('done')
+
+    def action_cancel(self):
+        return self._transition_to('cancel')
+
+    def action_reset_to_draft(self):
+        return self._transition_to('draft')
 
     @api.model
     def create(self, vals):

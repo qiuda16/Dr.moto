@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Iterable
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -22,9 +22,9 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
@@ -38,13 +38,34 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
+        role: str = payload.get("role", "staff")
+        email: str = payload.get("email")
         if username is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
+        token_data = TokenData(username=username, role=role, email=email)
     except JWTError:
         raise credentials_exception
     
     # In a real app, we would query the DB here.
     # For MVP, we'll return a mock user object.
-    user = User(username=username, email=f"{username}@example.com", disabled=False)
+    user = User(
+        username=token_data.username,
+        email=token_data.email or f"{token_data.username}@example.com",
+        role=token_data.role or "staff",
+        disabled=False
+    )
     return user
+
+
+def require_roles(allowed_roles: Iterable[str]):
+    allowed = {role.strip().lower() for role in allowed_roles}
+
+    async def dependency(current_user: User = Depends(get_current_user)):
+        if current_user.disabled:
+            raise HTTPException(status_code=403, detail="User is disabled")
+        user_role = (current_user.role or "").lower()
+        if user_role not in allowed:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return current_user
+
+    return dependency
