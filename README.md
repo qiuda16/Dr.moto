@@ -1,26 +1,486 @@
-# DrMoto Project (Monorepo)
+# 机车博士 DrMoto
 
-This repository is organized as a set of **sub-projects** that can be developed and delivered independently while integrating through the **BFF/API** layer.
+面向摩托车 / 机车售后维修业务的门店管理与资料数字化平台。
 
-## Sub-projects
-- `infra/` — infrastructure and DevOps
-- `odoo/` — Odoo core configuration and custom addons
-- `bff/` — external API gateway/BFF service (single entrypoint)
-- `clients/` — WeChat mini-program and internal web apps
-- `ai/` — AI customer service and future AI modules
-- `analytics/` — reporting and KPI definitions
-- `docs/` — architecture and specifications
-- `scripts/` — setup and maintenance scripts
+本项目不是单一网站，而是一套完整的业务系统，包含：
 
-## Key non-negotiables (MUST)
-1. **Inventory truth lives in Odoo** (all stock changes via Odoo posted transactions).
-2. **Clients call BFF only** (no direct DB/Odoo access).
-3. **Idempotency for critical actions** (issue/return/reverse/payment notify).
-4. **Auditability** (status logs, audit logs, immutable payment records).
+- 门店内部 SaaS 后台
+- 客户侧查询端 / 小程序端
+- BFF 业务中台
+- Odoo 业务底座与自定义模块
+- OCR / AI / 本地大模型辅助能力
+- 标准车型、标准配件、标准资料库
+- 维修手册数字化、审核、分段、回写标准库能力
 
-## Quick start (local)
-1. Start with `infra/` (compose, env, Odoo+Postgres) and ensure Odoo is reachable.
-2. Install `odoo/addons/drmoto_mro` to validate the addon mount path.
-3. Bring up `bff/` and expose minimal APIs to the WeChat mini-program.
+当前仓库已经发展为一个可本地运行、可持续迭代、适合单店试运行和持续打磨的准生产版项目。
 
-> Generated folder scaffold on 2025-12-17.
+## 1. 项目目标
+
+DrMoto 的目标是建设一套适用于摩托车维修门店的数字化系统，覆盖从客户到店、接车建档、维修报价、施工记录、完工体检、交车结算，到维修手册数字化和 AI 辅助查询的全流程。
+
+核心方向：
+
+- 用一套系统承载门店主业务流
+- 用“标准车型库 + 标准配件库 + 标准资料库”沉淀长期资产
+- 用 OCR、资料审核、手册分段和本地大模型能力，把维修手册逐步转成可检索、可审核、可回写的知识库
+- 为后续维修导师 / Jarvis / 小程序客户服务能力打基础
+
+## 2. 当前能力范围
+
+目前仓库已经包含以下主要能力：
+
+### 2.1 门店业务后台
+
+- 总览看板
+- 工单中心
+- 客户库
+- 主数据中心
+- 标准车型库
+- 标准配件库
+- 标准资料库
+- 门店设置页
+
+### 2.2 工单主流程
+
+- 快速接车
+- 新客户 / 老客户建档
+- 客户与名下实际车辆关联
+- 工单项目选择
+- 报价生成 / 发布 / 确认
+- 施工记录
+- 完工体检
+- 交车确认
+- 单据输出
+
+### 2.3 主数据能力
+
+- 标准车型
+- 标准项目
+- 标准作业卡
+- 标准规格
+- 标准服务套餐
+- 配件型号与兼容关系
+- 维修手册资料上传与审核
+
+### 2.4 AI / OCR / 手册数字化
+
+- 本地 PaddleOCR-VL 文档解析
+- 资料 OCR 结果查看、编辑、审核
+- 车型候选识别与确认
+- 维修手册分段 PDF 生成
+- 分段与标准车型挂接
+- 分段与标准项目推荐定位
+- 本地大模型辅助页面分类与结构化抽取
+- 标准规格 / 标准作业卡回写能力
+
+### 2.5 客户侧
+
+- H5 客户端
+- Uni-app 小程序端基础工程
+- 客户车辆、工单、保养建议、知识查询相关前端代码
+
+## 3. 总体架构
+
+系统采用“业务底座 + BFF + 前端客户端 + AI/OCR 服务 + 对象存储”的结构。
+
+### 3.1 核心组件
+
+- `Odoo`
+  - 业务底座
+  - 承载部分客户、车辆、工单、流程对象
+
+- `BFF`
+  - 外部统一入口
+  - 对前端暴露统一 API
+  - 承载本地扩展表、审核流、资料库、设置、标准库增强能力
+
+- `web_staff`
+  - 门店内部 SaaS 后台
+
+- `mp_customer` / `mp_customer_uni`
+  - 客户侧查询端 / 小程序端
+
+- `AI`
+  - 检索、助手、OCR 后处理、本地模型辅助
+
+- `PaddleOCR-VL`
+  - PDF 手册解析
+
+- `PostgreSQL`
+  - `odoo` 和 `bff` 两个业务库
+
+- `Redis`
+  - 缓存、锁、轻量状态
+
+- `MinIO`
+  - 文件、图片、PDF、附件对象存储
+
+### 3.2 数据 ownership 原则
+
+- Odoo：承载业务底座和部分原始业务对象
+- BFF：承载外部 API、标准库增强、资料库、设置、审核和桥接能力
+- MinIO：承载 PDF、图片、单据等文件
+- Redis：承载缓存与轻量运行状态
+
+前端不直接访问数据库，也不直接访问 Odoo 业务表。
+
+## 4. 仓库目录说明
+
+```text
+drmoto/
+├─ ai/                     AI、OCR、RAG、本地模型辅助
+├─ analytics/              指标与分析说明
+├─ bff/                    FastAPI BFF 与扩展业务模型
+├─ clients/                员工端、客户端、小程序端前端
+├─ docs/                   架构、方案、交付与测试文档
+├─ edge/                   边缘能力预留（语音、视觉、Jarvis）
+├─ infra/                  Docker Compose、环境样例、运行说明
+├─ odoo/                   Odoo 自定义模块
+├─ scripts/                维护、巡检、测试、回填脚本
+├─ storage/                存储域说明
+└─ README.md               本文件
+```
+
+## 5. 主要子项目说明
+
+### 5.1 `clients/web_staff`
+
+门店内部后台，当前是本项目最主要的操作入口。
+
+包含：
+
+- 总览看板
+- 工单中心
+- 客户库
+- 主数据中心
+- 门店设置页
+
+适合本地门店日常使用和持续迭代验证。
+
+### 5.2 `clients/mp_customer`
+
+客户侧 H5 工程。
+
+包含：
+
+- 登录
+- 车辆信息
+- 工单信息
+- 保养建议
+- 知识查询
+
+### 5.3 `clients/mp_customer_uni`
+
+Uni-app 小程序端工程，用于后续微信小程序正式交付。
+
+### 5.4 `bff`
+
+FastAPI 编写的业务中台与统一接口层。
+
+主要负责：
+
+- 鉴权
+- 前端统一 API
+- 标准库能力
+- 资料库能力
+- OCR 任务编排
+- 审核与回写
+- 门店设置
+- 工单增强能力
+- 本地扩展数据模型
+
+### 5.5 `ai`
+
+AI 服务层。
+
+当前包含：
+
+- OCR 后处理
+- 页面分类
+- 结构化抽取
+- RAG 检索
+- 本地 Ollama / Qwen 模型接入
+
+### 5.6 `odoo`
+
+Odoo 业务底座与自定义模块。
+
+当前重点模块：
+
+- `drmoto_mro`
+
+### 5.7 `docs`
+
+项目文档中心，包含：
+
+- 架构设计
+- 数据模型
+- 交付说明
+- 测试报告
+- OCR / Jarvis 路线图
+- 生产 SOP
+
+## 6. 本地运行环境
+
+推荐环境：
+
+- Windows 10/11
+- Docker Desktop
+- Node.js / npm
+- Python
+- 本地 Ollama
+- NVIDIA GPU（若使用 PaddleOCR-VL GPU 推理）
+
+当前项目默认按 Docker Compose 本地运行。
+
+## 7. 快速启动
+
+### 7.1 启动基础服务
+
+在 `infra/` 目录运行：
+
+```powershell
+docker compose up -d
+```
+
+会启动主要服务：
+
+- `db`
+- `redis`
+- `odoo`
+- `bff`
+- `minio`
+- `ai`
+- `ocr_vl`
+- `db-ui`
+
+### 7.2 前端开发启动
+
+员工端：
+
+```powershell
+cd clients/web_staff
+npm install
+npm run dev
+```
+
+默认访问：
+
+- 员工端：[http://127.0.0.1:5173](http://127.0.0.1:5173)
+
+后端健康检查：
+
+- BFF 健康检查：[http://127.0.0.1:18080/health](http://127.0.0.1:18080/health)
+
+Odoo：
+
+- [http://127.0.0.1:8069](http://127.0.0.1:8069)
+
+OCR 服务：
+
+- [http://127.0.0.1:18118](http://127.0.0.1:18118)
+
+### 7.3 设置页
+
+当前系统有独立设置页，用于维护门店基础配置：
+
+- [http://127.0.0.1:5173/settings](http://127.0.0.1:5173/settings)
+
+当前支持配置：
+
+- 店名
+- 品牌名
+- 侧边栏角标
+- 主色
+- 默认工时价
+- 默认交车备注
+- 常用主诉短语
+
+## 8. 默认运行方式说明
+
+当前本地体验主要使用：
+
+- 员工端：`http://127.0.0.1:5173`
+- BFF：`http://127.0.0.1:18080`
+- Odoo：`http://127.0.0.1:8069`
+
+用户日常使用入口通常是员工端 `5173`。
+
+## 9. 数据库说明
+
+当前系统有两个主业务数据库，位于同一个 PostgreSQL 实例内：
+
+- `odoo`
+- `bff`
+
+另外还有两个辅助存储：
+
+- `Redis`
+- `MinIO`
+
+从业务视角，系统当前围绕这几类“主库”展开：
+
+- 客户库
+- 工单库
+- 标准车型库
+- 标准配件库
+- 标准资料库
+
+## 10. 资料库 / OCR / 标准资料流
+
+当前标准资料库流程大致如下：
+
+1. 上传 PDF 手册
+2. OCR 识别
+3. 识别候选品牌 / 车型 / 年份 / 页面结构
+4. 人工确认对应标准车型
+5. 生成目录分段和分段 PDF
+6. 审核步骤 / 规格 / 章节
+7. 回写：
+   - 标准作业卡
+   - 标准规格
+   - 标准项目所需配件
+
+当前已经接入：
+
+- PaddleOCR-VL
+- 本地 Ollama
+- Qwen 系列本地模型辅助分类/抽取
+
+## 11. 搜索与匹配能力
+
+当前项目已经对多处搜索做了相关性优化，包括：
+
+- 标准车型搜索
+- 标准配件搜索
+- 工单车牌搜索
+- 客户搜索
+- 标准资料搜索
+- 手册分段搜索
+
+整体方向是：
+
+- 精确命中优先
+- 前缀命中优先
+- 关键字段加权
+- 再回退到普通包含匹配
+
+## 12. 测试与验证
+
+当前仓库已包含：
+
+- BFF 自动化测试
+- OCR 抽取测试
+- 多个脚本化 smoke test
+- 数据库结构巡检脚本
+
+常用测试命令：
+
+```powershell
+C:\Users\WIN10\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest .\bff\tests
+```
+
+数据库完整性巡检：
+
+```powershell
+C:\Users\WIN10\AppData\Local\Python\pythoncore-3.14-64\python.exe .\scripts\db_integrity_audit.py
+```
+
+历史工单车型桥接未补全检查：
+
+```powershell
+C:\Users\WIN10\AppData\Local\Python\pythoncore-3.14-64\python.exe .\scripts\unresolved_work_order_vehicle_keys.py
+```
+
+## 13. 当前项目状态
+
+当前阶段可以定义为：
+
+- 不是 Demo
+- 不是纯原型
+- 已经是单店可用的准生产版
+
+更准确地说：
+
+- 业务闭环已成型
+- 主数据体系已建立
+- 资料库 / OCR / 分段 / 标准库回写已打通第一代能力
+- 工程化和数据库结构已经开始稳定化
+- 仍然适合继续迭代收口，而不是直接大规模复制部署
+
+## 14. 适合当前版本做什么
+
+当前版本适合：
+
+- 单店本地使用
+- 持续录入数据
+- 优化工单主流程
+- 沉淀标准车型资料
+- 沉淀维修项目、标准规格、标准作业卡
+- 持续打磨 OCR 与标准库能力
+
+## 15. 当前版本不建议直接假设为已完成的部分
+
+当前仍不建议把以下部分视为“完全成熟商用品”：
+
+- 多账号权限体系
+- 多店组织化管理
+- 大规模并发压测后的稳定性结论
+- 完全无人审核的 OCR 自动入库
+- 完整 Jarvis / 维修导师最终形态
+
+## 16. 代码仓库中不包含的内容
+
+当前 Git 仓库上传的是项目源码、脚本、文档和配置样例。
+
+默认不纳入版本库的内容包括：
+
+- 本地数据库文件
+- 本地日志
+- 本地 OCR 缓存数据
+- 临时测试 PDF
+- 临时调试输出
+- 备份文件
+- 运行产物
+
+这些内容通常由 `.gitignore` 控制，不属于源码本体。
+
+## 17. 推荐阅读顺序
+
+如果你第一次接触这个仓库，建议按这个顺序读：
+
+1. 本 README
+2. [docs/architecture.md](docs/architecture.md)
+3. [docs/master_spec.md](docs/master_spec.md)
+4. [docs/data_model.md](docs/data_model.md)
+5. [docs/jarvis_workshop_blueprint.md](docs/jarvis_workshop_blueprint.md)
+6. [docs/final_delivery_gap_checklist_2026-04-15.md](docs/final_delivery_gap_checklist_2026-04-15.md)
+
+## 18. 开发与维护建议
+
+- 优先通过 `BFF` 暴露前端能力，不直接绕过中台访问 Odoo 或数据库
+- 保持“客户库 / 工单库 / 标准车型库 / 标准配件库 / 标准资料库”这一套主心智
+- 新增默认值尽量进入门店设置，而不是继续写死在前端代码里
+- 与维修手册相关的新能力，优先考虑可审核、可追溯、可回写
+- 历史数据修复时优先补业务源数据，不要简单硬加数据库约束
+
+## 19. GitHub 上传说明
+
+当前仓库已上传项目主代码到 GitHub。
+
+如果某些目录在 GitHub 首页右侧显示“几个月前”，那是 GitHub 的正常行为：
+
+- 它显示的是“该路径上次被修改的提交时间”
+- 不是“整仓最近一次推送时间”
+
+只要当前分支或 `main` 已经推送，源码就已经在仓库里。
+
+---
+
+如果你要把这个仓库继续往“可复制交付版本”推进，建议优先做：
+
+- 高频页面文案和交付感继续收口
+- 设置中心继续补齐
+- 主流程经营场景回归
+- OCR 与标准库回写继续提稳
+- 工程目录和发布材料继续收口
