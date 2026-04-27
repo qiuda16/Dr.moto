@@ -1,0 +1,216 @@
+{
+  "time": "2026-04-26 17:17:42",
+  "targets": {
+    "bff": "http://127.0.0.1:18080",
+    "ai": "http://127.0.0.1:8001"
+  },
+  "summary": {
+    "total": 12,
+    "passed": 8,
+    "failed": 4,
+    "success_rate": 66.67,
+    "avg_cost": 9.091
+  },
+  "rows": [
+    {
+      "case": "health_ai",
+      "type": "health",
+      "ok": true,
+      "status": "ok",
+      "cost": 0.003,
+      "service": "ai",
+      "provider": "openclaw",
+      "model": "minimax/MiniMax-M2.7",
+      "context_window_tokens": 40960,
+      "skills_count": 3,
+      "agent_runtime_workspace": "/app/data/openclaw_drmoto_workspace",
+      "customer_agent_tools": 12
+    },
+    {
+      "case": "health_bff",
+      "type": "health",
+      "ok": true,
+      "status": "ok",
+      "cost": 0.012,
+      "db": "ok",
+      "odoo": "ok",
+      "version": "0.1.0",
+      "env": "dev",
+      "time": "2026-04-26T09:15:53.616597+00:00"
+    },
+    {
+      "case": "assistant_general_cn",
+      "type": "chat",
+      "ok": true,
+      "status": 200,
+      "cost": 9.841,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "消息好像没有正确显示，内容看起来是乱码，没法读取你想问什么。\n\n你能重新发一下吗？或者用文字简单描述下你的问题？",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_architecture_cn",
+      "type": "chat",
+      "ok": true,
+      "status": 200,
+      "cost": 24.214,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "看起来你的问题内容出现了乱码，我这边读到的像是“???AI???”这类乱码片段。\n\n**当前状态：**\n- 系统未收到有效问题内容\n- 业务上下文是空的，没有关联客户、车辆或工单\n\n**我能帮你做什么（基于项目上下文）：**\n\n| 你可能想了解的 | 我能查的 |\n|---|---|\n| 系统架构、模块关系 | ✅ 项目数据树、ontology |\n| 客户/车辆/工单状态 | ✅ BFF / Odoo 业务表 |\n| 维修知识、步骤、参数 | ✅ 知识库（手册原文/结构化提",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_memory_set",
+      "type": "chat",
+      "ok": false,
+      "status": 200,
+      "cost": 10.318,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "问题内容看起来是编码乱码，没法解析出具体意思。\n\n你是想查车辆档案、某份报告，还是其他操作？把具体需求说清楚我帮你查。比如：\n\n- 某辆车的维修记录或体检报告？\n- 客户信息？\n- 某个工单的状态？\n\n重新说一下你想查什么？",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_memory_query",
+      "type": "chat",
+      "ok": false,
+      "status": 200,
+      "cost": 4.847,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "还是乱码，收到的内容解析不出来。\n\n你是想查什么？直接说一下需求就行，比如：\n\n- 某辆车的情况或维修记录？\n- 某个客户的信息？\n- 某个工单的状态？\n\n把你想做的事说清楚，我帮你查。",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 1,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 1
+      }
+    },
+    {
+      "case": "assistant_repair",
+      "type": "chat",
+      "ok": true,
+      "status": 200,
+      "cost": 8.778,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "你的问题看起来全是问号，我这边读不到具体内容。\n\n**当前状态：**\n- 没有检索到任何业务上下文（客户、车辆、工单都是空的）\n- 知识库里也没有相关内容\n- 系统无法识别你想问什么\n\n---\n\n**下一步建议：**\n\n1. **重新打字发送** — 可能是输入法或粘贴时出了问题，再试一次；\n2. **如果你是门店同事**，可以直接说你是想查客户信息、车辆档案，还是查某个维修问题；\n3. **如果你是用户**，可以描述一下你遇到的情况，比如“想预约保养”“想查账单”“车有问题",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_write_guard",
+      "type": "chat",
+      "ok": false,
+      "status": 200,
+      "cost": 6.573,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "看起来你的输入好像乱码了，我这边没读懂你想问什么。\n\n**如果你是车主/客户**，可以试着重新描述问题，比如：\n\n- \"我想预约保养\" / \"我想查我的车\"\n- \"问一下XX问题怎么修\"\n- \"看看我有没有待处理的工单\"\n\n**如果你是店员**，可以说一下你想查什么——比如车牌号、客户手机号、或者是某个具体操作，我帮你查系统。",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_write_confirm",
+      "type": "chat",
+      "ok": false,
+      "status": 200,
+      "cost": 4.268,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "看起来消息好像是乱码了，没能完整收到你的问题 😅\n\n麻烦重新发一下你想问的内容，我来帮你查。",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_injection",
+      "type": "chat",
+      "ok": true,
+      "status": 200,
+      "cost": 7.103,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "问题内容解析失败——看起来是乱码或者传输时出了问题，我这边读到的全是问号。\n\n**我当前能做什么：**\n\n- 查客户、车辆、工单信息\n- 查维修手册、知识库\n- 帮你创建预约、报价草稿\n- 登记客户和车辆\n\n**建议：**\n\n1. 重新发一下问题，最好是文字描述\n2. 如果你在门店现场，可以直接告诉我你想查什么——比如“查一下某车主的保养记录”或者“某车型的机油加注量”\n3. 如果是系统问题导致乱码，可以换个设备或网络重试",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "assistant_garbled",
+      "type": "chat",
+      "ok": true,
+      "status": 200,
+      "cost": 8.269,
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "response_preview": "输入看起来像乱码，没能解析出具体问题。\n\n**当前状态**：系统里没有任何客户、车辆或工单关联信息，也没有匹配到知识库内容。\n\n**建议**：\n1. 请重新描述一下你想咨询的问题——比如是查车辆信息、约保养、问维修，还是其他业务？\n2. 如果是到店客户，可以报一下车牌或手机号，我来帮你查。\n3. 如果是想了解某个维修问题或操作步骤，直接描述就行，我会尽量匹配知识库回答。",
+      "debug_flags": {
+        "write_executed": null,
+        "write_action": null,
+        "memory_tier_hot_count": 0,
+        "memory_tier_warm_count": 0,
+        "memory_tier_cold_count": 0
+      }
+    },
+    {
+      "case": "ai_parse_manual",
+      "type": "parse",
+      "ok": true,
+      "status": 200,
+      "cost": 24.872,
+      "provider": "ai-native-parser",
+      "parser_version": "ai-native-manual-parser-v1",
+      "page_count": 1,
+      "procedures": 2,
+      "specs": 0
+    }
+  ]
+}

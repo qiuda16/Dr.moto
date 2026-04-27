@@ -30,6 +30,19 @@
           <span>{{ customerDomainText }}</span>
     </div>
 
+    <el-alert
+      v-if="pageError"
+      :title="pageError"
+      type="error"
+      show-icon
+      :closable="false"
+      class="page-alert"
+    >
+      <template #default>
+        <el-button text type="primary" @click="loadCustomers">重新加载客户库</el-button>
+      </template>
+    </el-alert>
+
     <div class="card toolbar-card">
       <div class="toolbar">
         <el-input
@@ -61,6 +74,8 @@
         ref="customerTableRef"
         :data="customers"
         v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.customers"
         row-key="id"
         @selection-change="onCustomerSelectionChange"
         @row-dblclick="onCustomerRowDblClick"
@@ -359,7 +374,13 @@
                 <span>体检时间线（{{ selectedVehiclePlate || '未选择车辆' }}）</span>
               </div>
 
-              <el-table :data="healthRecords" v-loading="healthLoading" style="width: 100%">
+              <el-table
+                :data="healthRecords"
+                v-loading="healthLoading"
+                :element-loading-text="TABLE_LOADING_TEXT"
+                :empty-text="EMPTY_TEXT.healthRecords"
+                style="width: 100%"
+              >
                 <el-table-column prop="measured_at" label="体检时间" width="180" />
                 <el-table-column prop="odometer_km" label="里程(km)" width="110" />
                 <el-table-column prop="odometer_delta_from_prev" label="较上次变化" width="120">
@@ -383,7 +404,7 @@
                 <span>历史工单（{{ selectedVehiclePlate || '全部车辆' }}）</span>
               </div>
 
-              <el-table :data="selectedVehicleOrders" style="width: 100%" @row-dblclick="openOrderFromProfile">
+              <el-table :data="selectedVehicleOrders" :empty-text="EMPTY_TEXT.customerOrders" style="width: 100%" @row-dblclick="openOrderFromProfile">
                 <el-table-column prop="name" label="工单号" min-width="160" />
                 <el-table-column prop="vehicle_plate" label="车牌" width="110" />
                 <el-table-column prop="state" label="状态" width="110" />
@@ -644,6 +665,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
 import Sortable from 'sortablejs'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const route = useRoute()
 const router = useRouter()
@@ -686,6 +709,7 @@ const savingVehicleEdit = ref(false)
 const vehicleBrandOptions = ref([])
 const vehicleModelOptionsByBrand = ref({})
 const appSettings = reactive(createAppSettingsState())
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 
 const totalVehicleCount = computed(() => customers.value.reduce((sum, item) => sum + Number(item.vehicle_count || (item.vehicles || []).length || 0), 0))
 const customersWithVehicles = computed(() => customers.value.filter((item) => Number(item.vehicle_count || (item.vehicles || []).length || 0) > 0).length)
@@ -978,6 +1002,7 @@ const loadCustomers = async () => {
     const res = await request.get('/mp/workorders/customers/with-vehicles', {
       params: { query: query.value || '', limit: 50 }
     })
+    clearPageError()
     customers.value = applyCustomerPresentation(res || [])
     if (pendingHealthJump.value?.customerId) {
       const jump = pendingHealthJump.value
@@ -1000,6 +1025,9 @@ const loadCustomers = async () => {
     }
     await nextTick()
     initCustomerSortable()
+  } catch (error) {
+    setPageError('加载客户库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载客户库失败')
   } finally {
     loading.value = false
   }

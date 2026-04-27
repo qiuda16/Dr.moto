@@ -3,7 +3,7 @@
     <div class="card settings-head">
       <div>
         <h2>门店设置</h2>
-        <p>这里只管理高频默认值，不改变系统布局。保存后，工单中心、主数据中心和壳层标题会自动使用新设置。</p>
+        <p>这里管理高频默认值和单据模板口径。保存后，工单中心、主数据中心、首页和单据输出会自动使用最新设置。</p>
       </div>
       <div class="head-actions">
         <el-button @click="loadSettings">刷新</el-button>
@@ -42,8 +42,26 @@
           <el-form-item label="默认交车备注">
             <el-input v-model="form.default_delivery_note" type="textarea" :rows="4" maxlength="255" show-word-limit />
           </el-form-item>
+          <el-form-item label="默认售后提醒">
+            <el-input v-model="form.default_service_advice" type="textarea" :rows="4" maxlength="255" show-word-limit />
+          </el-form-item>
         </el-form>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">单据模板口径</div>
+      <el-form :model="form" label-width="130px">
+        <el-form-item label="单据页眉说明">
+          <el-input v-model="form.document_header_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+        <el-form-item label="客户联页脚说明">
+          <el-input v-model="form.customer_document_footer_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+        <el-form-item label="内部联页脚说明">
+          <el-input v-model="form.internal_document_footer_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+      </el-form>
     </div>
 
     <div class="card">

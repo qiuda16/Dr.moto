@@ -1,6 +1,6 @@
 param(
     [string]$ComposeFile = "infra/docker-compose.yml",
-    [string]$BaseUrl = "http://localhost:8080",
+    [string]$BaseUrl = "http://localhost:18080",
     [string]$AdminUsername = "admin",
     [string]$AdminPassword = "",
     [string]$StoreId = "default",
@@ -16,7 +16,7 @@ function Invoke-PsScript {
         [Parameter(Mandatory = $true)][string]$ScriptPath,
         [string[]]$Arguments = @()
     )
-    & powershell -ExecutionPolicy Bypass -File $ScriptPath @Arguments
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Script failed: $ScriptPath (exit code: $LASTEXITCODE)"
     }

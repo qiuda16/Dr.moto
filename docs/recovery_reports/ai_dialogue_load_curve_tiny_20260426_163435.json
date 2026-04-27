@@ -1,0 +1,35 @@
+{
+  "time": "2026-04-26 16:34:35",
+  "profiles": [
+    {
+      "profile": "Q1",
+      "N": 10,
+      "W": 2,
+      "ok": 0,
+      "fail": 10,
+      "pass_rate": 0.0,
+      "timeout_fail": 10,
+      "duration": 125.05
+    },
+    {
+      "profile": "Q2",
+      "N": 20,
+      "W": 3,
+      "ok": 0,
+      "fail": 20,
+      "pass_rate": 0.0,
+      "timeout_fail": 20,
+      "duration": 175.1
+    },
+    {
+      "profile": "Q3",
+      "N": 30,
+      "W": 4,
+      "ok": 0,
+      "fail": 30,
+      "pass_rate": 0.0,
+      "timeout_fail": 30,
+      "duration": 200.09
+    }
+  ]
+}

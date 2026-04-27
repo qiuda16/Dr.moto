@@ -9,6 +9,19 @@
       <el-button type="primary" plain :loading="syncing" @click="syncCatalog">同步车型基础库</el-button>
     </div>
 
+    <el-alert
+      v-if="pageError"
+      :title="pageError"
+      type="error"
+      show-icon
+      :closable="false"
+      class="page-alert"
+    >
+      <template #default>
+        <el-button text type="primary" @click="retryActiveTabLoad">重新加载当前数据</el-button>
+      </template>
+    </el-alert>
+
     <div class="summary-grid">
       <div class="card summary-card"><span>车型数</span><strong>{{ vehiclePager.total }}</strong></div>
       <div class="card summary-card"><span>配件数</span><strong>{{ partPager.total }}</strong></div>
@@ -66,7 +79,7 @@
             <el-button type="success" @click="openVehicleDialog()">新增标准车型</el-button>
           </div>
 
-          <el-table :data="vehicleRows" v-loading="vehicleLoading" style="width: 100%" @row-dblclick="openVehicleDetail">
+          <el-table :data="vehicleRows" v-loading="vehicleLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.vehicleCatalog" style="width: 100%" @row-dblclick="openVehicleDetail">
             <el-table-column prop="brand" label="品牌" width="140" />
             <el-table-column prop="model_name" label="车型" min-width="180" />
             <el-table-column label="年份" width="140">
@@ -99,7 +112,7 @@
             <el-button type="success" @click="openPartDialog()">新增标准配件</el-button>
           </div>
 
-          <el-table :data="partRows" v-loading="partLoading" style="width: 100%" @row-dblclick="openPartDialog">
+          <el-table :data="partRows" v-loading="partLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.parts" style="width: 100%" @row-dblclick="openPartDialog">
             <el-table-column prop="part_no" label="料号" width="160" />
             <el-table-column prop="name" label="名称" min-width="180" />
             <el-table-column prop="brand" label="品牌" width="120" />
@@ -170,7 +183,7 @@
             <el-button @click="resetLibraryFilters">重置</el-button>
           </div>
 
-          <el-table :data="libraryDocuments" v-loading="libraryLoading" style="width: 100%" @row-dblclick="openLibraryRow">
+          <el-table :data="libraryDocuments" v-loading="libraryLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.documents" style="width: 100%" @row-dblclick="openLibraryRow">
             <el-table-column prop="title" label="资料名称" min-width="220" show-overflow-tooltip />
             <el-table-column prop="category" label="分类" width="120" />
             <el-table-column prop="file_name" label="文件名" min-width="200" show-overflow-tooltip />
@@ -338,7 +351,7 @@
           <el-button type="primary" @click="openServiceItemDialog()">新增标准项目</el-button>
         </div>
       </div>
-      <el-table :data="serviceItems" v-loading="serviceLoading" style="width: 100%">
+      <el-table :data="serviceItems" v-loading="serviceLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.serviceItems" style="width: 100%">
         <el-table-column prop="service_name" label="标准项目" min-width="180" />
         <el-table-column prop="service_code" label="编码" width="120" />
         <el-table-column prop="labor_hours" label="工时(h)" width="90" />
@@ -383,7 +396,7 @@
             <el-button type="primary" @click="openServicePackageDialog()">新增套餐</el-button>
           </div>
         </div>
-        <el-table :data="servicePackages" v-loading="servicePackageLoading" style="width: 100%">
+        <el-table :data="servicePackages" v-loading="servicePackageLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.servicePackages" style="width: 100%">
           <el-table-column prop="package_name" label="套餐名称" min-width="180" />
           <el-table-column prop="package_code" label="编码" width="140" />
           <el-table-column label="建议周期" min-width="160">
@@ -428,7 +441,7 @@
           </div>
           <el-button @click="openVehicleSpecDialog()">新增参数</el-button>
         </div>
-        <el-table :data="vehicleSpecs" style="width: 100%">
+        <el-table :data="vehicleSpecs" :empty-text="EMPTY_TEXT.vehicleSpecs" style="width: 100%">
           <el-table-column prop="spec_label" label="参数名称" min-width="180" />
           <el-table-column prop="spec_type" label="类型" width="120" />
           <el-table-column label="参数值" width="160">
@@ -468,7 +481,7 @@
             共 {{ knowledgeSegments.length }} 条，当前显示 {{ filteredKnowledgeSegments.length }} 条
           </div>
         </div>
-        <el-table :data="filteredKnowledgeSegments" style="width: 100%">
+        <el-table :data="filteredKnowledgeSegments" :empty-text="EMPTY_TEXT.knowledgeSegments" style="width: 100%">
           <el-table-column prop="chapter_no" label="章节号" width="90" />
           <el-table-column prop="title" label="章节名称" min-width="220" />
           <el-table-column label="页码范围" width="120">
@@ -502,7 +515,7 @@
             <p>把原厂手册里的标准步骤、扭矩、工具和注意事项整理成标准作业卡，后面可进一步接到工单和打印单据里。</p>
           </div>
         </div>
-        <el-table :data="manualProcedures" style="width: 100%">
+        <el-table :data="manualProcedures" :empty-text="EMPTY_TEXT.manualCards" style="width: 100%">
           <el-table-column prop="name" label="作业卡名称" min-width="220" />
           <el-table-column prop="description" label="说明" min-width="260" show-overflow-tooltip />
           <el-table-column prop="steps_count" label="步骤数" width="90" />
@@ -1678,6 +1691,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import request from '../utils/request'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const route = useRoute()
 const router = useRouter()
@@ -1705,6 +1720,7 @@ const vehicleDetailVisible = ref(false)
 const vehicleForm = reactive({ id: null, brand: '', model_name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), displacement_cc: null, category: '', fuel_type: 'gasoline', default_engine_code: '' })
 const vehicleDetail = reactive({ id: null, brand: '', model_name: '', year_from: null, year_to: null })
 const appSettings = reactive(createAppSettingsState())
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 const serviceItems = ref([])
 const servicePackages = ref([])
 const vehicleSpecs = ref([])
@@ -2243,9 +2259,13 @@ const loadParts = async () => {
   partLoading.value = true
   try {
     const res = await request.get('/mp/catalog/parts', { params: { page: partPager.page, size: partPager.size, category: partFilters.category || '', keyword: partFilters.keyword || '' } })
+    clearPageError()
     partRows.value = res?.items || []
     partOptions.value = partRows.value
     partPager.total = Number(res?.total || 0)
+  } catch (error) {
+    setPageError('加载标准配件库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准配件库失败')
   } finally { partLoading.value = false }
 }
 const loadPartCategories = async () => { partCategories.value = await request.get('/mp/catalog/parts/categories') }
@@ -2257,8 +2277,12 @@ const loadVehicleModels = async () => {
   vehicleLoading.value = true
   try {
     const res = await request.get('/mp/catalog/vehicle-models', { params: { page: vehiclePager.page, size: vehiclePager.size, brand: vehicleFilters.brand || '', model_name: vehicleFilters.model_name || '', category: vehicleFilters.category || '', keyword: vehicleFilters.keyword || '' } })
+    clearPageError()
     vehicleRows.value = res?.items || []
     vehiclePager.total = Number(res?.total || 0)
+  } catch (error) {
+    setPageError('加载标准车型库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准车型库失败')
   } finally { vehicleLoading.value = false }
 }
 const loadServiceItems = async () => {
@@ -2422,10 +2446,19 @@ const loadLibraryDocuments = async () => {
       rows = rows.filter((row) => row?.review_status === 'needs_fix')
     }
     libraryDocuments.value = [...(rows || [])].sort((a, b) => libraryPriorityScore(a) - libraryPriorityScore(b))
+    clearPageError()
+  } catch (error) {
+    setPageError('加载标准资料库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准资料库失败')
   } finally {
     libraryLoading.value = false
     ensureLibraryPolling()
   }
+}
+const retryActiveTabLoad = async () => {
+  if (activeTab.value === 'vehicle') return loadVehicleModels()
+  if (activeTab.value === 'parts') return loadParts()
+  if (activeTab.value === 'documents') return loadLibraryDocuments()
 }
 const applyLibraryQuickFilter = async (mode) => {
   libraryQuickFilter.value = mode

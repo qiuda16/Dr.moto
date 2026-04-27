@@ -1,0 +1,95 @@
+{
+  "time": "2026-04-22 18:15:55",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "total": 400,
+    "workers": 40,
+    "timeout_seconds": 35
+  },
+  "summary": {
+    "total": 400,
+    "ok": 292,
+    "fail": 108,
+    "p50": 9.67,
+    "p90": 33.149,
+    "p95": 33.36,
+    "max": 33.873,
+    "avg": 15.456,
+    "low_info_fast_path": 35,
+    "llm_overload_fallback": 0
+  },
+  "error_samples": [
+    {
+      "status": -1,
+      "cost": 35.008034229278564,
+      "query": "现在待交付的车牌号都是多少",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.02514457702637,
+      "query": "系统里有哪些宝马车型",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.01580548286438,
+      "query": "系统里有哪些宝马车型",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.01530647277832,
+      "query": "帮我查下",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.031988859176636,
+      "query": "报价待确认的工单有哪些",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.02423453330994,
+      "query": "某辆摩托车后刹异响一般先检查什么",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.03359079360962,
+      "query": "帮我查下",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.01607155799866,
+      "query": "报价待确认的工单有哪些",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.00729060173035,
+      "query": "现在待交付的车牌号都是多少",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.030102491378784,
+      "query": "某辆摩托车后刹异响一般先检查什么",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.02394247055054,
+      "query": "这个客户的工单现在到哪一步了",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    },
+    {
+      "status": -1,
+      "cost": 35.01366376876831,
+      "query": "请记住客户王磊车牌京A12345，然后告诉我这个客户车牌是什么",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=18080): Read timed out. (read timeout=35)"
+    }
+  ]
+}

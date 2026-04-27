@@ -1,0 +1,91 @@
+{
+  "time": "2026-04-23 16:25:45",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "rounds": 8,
+    "workers": 8,
+    "timeout_seconds": 50,
+    "scenario_count": 25,
+    "seed": 20260423
+  },
+  "summary": {
+    "sessions_total": 200,
+    "sessions_ok": 200,
+    "sessions_fail": 0,
+    "turn_total": 208,
+    "turn_ok": 208,
+    "turn_fail": 0,
+    "p50": 0.805,
+    "p90": 8.758,
+    "p95": 17.179,
+    "max": 45.603,
+    "avg": 3.703,
+    "proxy_fallback": 5,
+    "low_info_fast_path": 16,
+    "global_query_fast_path": 16,
+    "store_ops_fast_path": 40,
+    "write_command_fast_path": 0,
+    "proxy_reason_counter": {
+      "ai_timeout": 5
+    },
+    "category_summary": {
+      "crm": {
+        "sessions": 16,
+        "session_ok": 16,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 13.858
+      },
+      "knowledge": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 0.683
+      },
+      "ops": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 8.126
+      },
+      "robustness": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 45.322
+      },
+      "sales": {
+        "sessions": 40,
+        "session_ok": 40,
+        "turn_total": 40,
+        "turn_ok": 40,
+        "turn_fail": 0,
+        "p95": 8.624
+      },
+      "service": {
+        "sessions": 40,
+        "session_ok": 40,
+        "turn_total": 40,
+        "turn_ok": 40,
+        "turn_fail": 0,
+        "p95": 10.836
+      },
+      "write_intent": {
+        "sessions": 32,
+        "session_ok": 32,
+        "turn_total": 32,
+        "turn_ok": 32,
+        "turn_fail": 0,
+        "p95": 5.298
+      }
+    }
+  },
+  "fail_samples": []
+}

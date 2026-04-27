@@ -35,7 +35,7 @@ services:
       - db
     restart: unless-stopped
     ports:
-      - "8069:8069"
+      - "127.0.0.1:8069:8069"
     volumes:
       - odoo_web_data:/var/lib/odoo
       - ../odoo/addons:/mnt/extra-addons
@@ -61,7 +61,7 @@ services:
       - redis
       - db
     ports:
-      - "18080:8080"
+      - "127.0.0.1:18080:8080"
     environment:
       - ODOO_URL=http://odoo:8069
       - ODOO_DB=${POSTGRES_DB:-odoo}
@@ -89,12 +89,14 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minio123456}
       - MINIO_BUCKET=${MINIO_BUCKET:-drmoto}
       - AI_URL=http://ai:8000
-      - OCR_REQUEST_TIMEOUT_SECONDS=${BFF_OCR_REQUEST_TIMEOUT_SECONDS:-1800}
+      - AI_PROXY_TIMEOUT_SECONDS=${BFF_AI_PROXY_TIMEOUT_SECONDS:-300}
+      - OCR_REQUEST_TIMEOUT_SECONDS=${BFF_OCR_REQUEST_TIMEOUT_SECONDS:-7200}
       - ENV=${BFF_ENV:-dev}
       - LOG_LEVEL=${BFF_LOG_LEVEL:-INFO}
       - LOG_FORMAT=${BFF_LOG_FORMAT:-json}
       - ENABLE_METRICS=${BFF_ENABLE_METRICS:-true}
       - METRICS_PATH=${BFF_METRICS_PATH:-/metrics}
+      - MAX_REQUEST_BODY_BYTES=${BFF_MAX_REQUEST_BODY_BYTES:-134217728}
       - DEFAULT_STORE_ID=${BFF_DEFAULT_STORE_ID:-default}
       - CORS_ORIGINS=${BFF_CORS_ORIGINS:-*}
       - ENABLE_DEV_ENDPOINTS=${BFF_ENABLE_DEV_ENDPOINTS:-true}
@@ -140,8 +142,8 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123456}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     networks:
@@ -152,20 +154,24 @@ services:
       context: ../ai
       dockerfile: Dockerfile
     restart: unless-stopped
-    depends_on:
-      - ocr_vl
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     environment:
       - BFF_URL=http://bff:8080
       - BFF_INTERNAL_SECRET=${BFF_WEBHOOK_SHARED_SECRET:-}
+      - BFF_AI_USERNAME=${BFF_ADMIN_USERNAME:-admin}
+      - BFF_AI_PASSWORD=${BFF_ADMIN_PASSWORD:-change_me_now}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - AI_LLM_PROVIDER=${AI_LLM_PROVIDER:-ollama}
+      - AI_LLM_PROVIDER=${AI_LLM_PROVIDER:-openclaw}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:8b}
       - OLLAMA_FALLBACK_MODEL=${OLLAMA_FALLBACK_MODEL:-qwen3:4b}
       - OLLAMA_CONTEXT_WINDOW=${OLLAMA_CONTEXT_WINDOW:-40960}
-      - OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS:-120}
+      - OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS:-300}
+      - AI_UVICORN_WORKERS=${AI_UVICORN_WORKERS:-1}
+      - AI_LLM_MAX_CONCURRENCY=${AI_LLM_MAX_CONCURRENCY:-1}
+      - AI_LLM_SEMAPHORE_WAIT_SECONDS=${AI_LLM_SEMAPHORE_WAIT_SECONDS:-0.8}
+      - AI_LLM_FIRST_RESPONSES=${AI_LLM_FIRST_RESPONSES:-true}
       - AI_CHAT_HISTORY_LIMIT=${AI_CHAT_HISTORY_LIMIT:-16}
       - AI_CONTEXT_PAYLOAD_MAX_CHARS=${AI_CONTEXT_PAYLOAD_MAX_CHARS:-16000}
       - AI_MEMORY_BACKEND=${AI_MEMORY_BACKEND:-redis}
@@ -176,12 +182,20 @@ services:
       - OCR_SERVICE_URL=http://ocr_vl:8080
       - OCR_SERVICE_TIMEOUT_SECONDS=${AI_OCR_SERVICE_TIMEOUT_SECONDS:-1800}
       - OCR_PDF_BATCH_PAGES=${AI_OCR_PDF_BATCH_PAGES:-4}
+      - MANUAL_PARSE_MODE=${AI_MANUAL_PARSE_MODE:-ai_native}
+      - MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK=${AI_MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK:-false}
       - OCR_LLM_CLASSIFIER_ENABLED=${AI_OCR_LLM_CLASSIFIER_ENABLED:-true}
-      - OCR_LLM_PROVIDER=${AI_OCR_LLM_PROVIDER:-ollama}
+      - OCR_LLM_PROVIDER=${AI_OCR_LLM_PROVIDER:-openclaw}
       - OCR_LLM_API_URL=${AI_OCR_LLM_API_URL:-http://host.docker.internal:11434}
       - OCR_LLM_MODEL=${AI_OCR_LLM_MODEL:-qwen3:4b}
       - OCR_LLM_API_KEY=${AI_OCR_LLM_API_KEY:-}
-      - OCR_LLM_TIMEOUT_SECONDS=${AI_OCR_LLM_TIMEOUT_SECONDS:-120}
+      - OCR_LLM_TIMEOUT_SECONDS=${AI_OCR_LLM_TIMEOUT_SECONDS:-300}
+      - OPENCLAW_CONFIG_JSON=/app/data/provider/openclaw.json
+      - OPENCLAW_MODELS_JSON=/app/data/provider/models.json
+      - OPENCLAW_TIMEOUT_SECONDS=${OPENCLAW_TIMEOUT_SECONDS:-300}
+      - AGENT_WORKSPACE_ROOT=/app/data/openclaw_drmoto_workspace
+      - AGENT_STATE_ROOT=/app/data/openclaw_drmoto_state
+      - OPENCLAW_WORKSPACE_ROOT=/app/data/openclaw_drmoto_workspace
     volumes:
       - ../ai/app:/app/app
       - ../ai/data:/app/data
@@ -203,7 +217,7 @@ services:
       - PYTHONIOENCODING=UTF-8
     ports:
       - "18118:8080"
-    gpus: all
+    gpus: []
     volumes:
       - paddlex_model_cache:/home/paddleocr/.paddlex
     networks:
@@ -213,7 +227,7 @@ services:
     image: adminer
     restart: always
     ports:
-      - "8082:8080"
+      - "127.0.0.1:8082:8080"
     environment:
       - ADMINER_DEFAULT_SERVER=db
       - ADMINER_DESIGN=pappu687

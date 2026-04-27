@@ -30,7 +30,14 @@ def run_psql(sql: str) -> list[dict[str, Any]]:
         "-c",
         sql,
     ]
-    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
     rows: list[dict[str, Any]] = []
     for line in result.stdout.splitlines():
         stripped = line.strip()

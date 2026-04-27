@@ -1,0 +1,18 @@
+{
+  "time": "2026-04-23 11:51:11",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "rounds": 6,
+    "case_count": 10,
+    "timeout_seconds": 65
+  },
+  "summary": {
+    "total": 60,
+    "ok": 60,
+    "fail": 0,
+    "quality_pass_rate": 100.0,
+    "avg_cost": 0.101,
+    "issue_counter": {}
+  },
+  "fail_samples": []
+}

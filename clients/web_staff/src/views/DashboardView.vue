@@ -292,7 +292,13 @@
         </div>
       </div>
 
-      <el-table :data="overview.recent.orders" v-loading="loading" style="width: 100%">
+      <el-table
+        :data="overview.recent.orders"
+        v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.recentOrders"
+        style="width: 100%"
+      >
         <el-table-column prop="id" label="工单号" min-width="240" />
         <el-table-column prop="vehicle_plate" label="车牌" width="140" />
         <el-table-column label="提醒" width="180">
@@ -324,6 +330,7 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import request from '../utils/request'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const router = useRouter()
 const loading = ref(false)

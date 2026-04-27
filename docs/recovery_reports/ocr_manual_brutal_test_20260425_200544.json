@@ -1,0 +1,96 @@
+{
+  "generated_at": "2026-04-25T20:05:44",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "store_id": "default",
+    "model_id": 113,
+    "model_info": {},
+    "quick_pdf": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+    "quick_rounds": 0,
+    "quick_workers": 4,
+    "real_pdf": "C:\\Users\\WIN10\\Desktop\\qd part\\biao\\原版英文2015-2017年川崎Versys+650+ABS维修手册(1).pdf",
+    "real_rounds": 1,
+    "real_workers": 1,
+    "cleanup_source_document": false,
+    "parse_timeout_seconds": 0,
+    "parse_stall_seconds": 900,
+    "resume_on_stall": true,
+    "existing_job_id": 51
+  },
+  "batches": [
+    {
+      "label": "quick",
+      "rounds": 0,
+      "workers": 4,
+      "results": [],
+      "summary": {
+        "total": 0,
+        "ok": 0,
+        "fail": 0,
+        "pass_rate": 0.0
+      }
+    },
+    {
+      "label": "real",
+      "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\biao\\原版英文2015-2017年川崎Versys+650+ABS维修手册(1).pdf",
+      "rounds": 1,
+      "workers": 1,
+      "results": [
+        {
+          "case_id": "real-001",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\biao\\原版英文2015-2017年川崎Versys+650+ABS维修手册(1).pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "parse_total_seconds": 0.994,
+            "bind_model_seconds": 0.265,
+            "import_specs_seconds": 0.216,
+            "materialize_segments_seconds": 0.307,
+            "sync_manual_parts_seconds": 0.031,
+            "total_seconds": 1.813
+          },
+          "ids": {
+            "job_id": 51,
+            "document_id": 334,
+            "bound_model_id": 2237
+          },
+          "counts": {
+            "parse_mode": "existing_job",
+            "parsed_pages": 665,
+            "summary_specs": 401,
+            "summary_procedures": 300,
+            "summary_sections": 916,
+            "bound_model_created": false,
+            "bind_mode": "auto_bind",
+            "imported_specs": 401,
+            "materialized_segments": 1,
+            "materialize_mode": "normal",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        }
+      ],
+      "summary": {
+        "total": 1,
+        "ok": 1,
+        "fail": 0,
+        "pass_rate": 100.0,
+        "wall_clock_seconds": 1.824,
+        "p50_seconds": 1.813,
+        "p90_seconds": 1.813,
+        "p95_seconds": 1.813,
+        "avg_seconds": 1.813,
+        "error_counter": {}
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "ok": 1,
+    "fail": 0,
+    "overall_pass": true,
+    "overall_pass_rate": 100.0
+  }
+}

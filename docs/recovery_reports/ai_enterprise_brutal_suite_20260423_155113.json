@@ -1,0 +1,427 @@
+{
+  "time": "2026-04-23T15:51:13.899155",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "workspace": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto"
+  },
+  "stages": [
+    {
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-RestMethod -Method Get -Uri http://127.0.0.1:18080/health -TimeoutSec 20 | ConvertTo-Json -Depth 5\"",
+      "exit_code": 0,
+      "duration_seconds": 0.542,
+      "output": "{\n    \"status\":  \"ok\",\n    \"db\":  \"ok\",\n    \"odoo\":  \"ok\",\n    \"version\":  \"0.1.0\",\n    \"env\":  \"dev\",\n    \"time\":  \"2026-04-23T07:42:16.686573+00:00\"\n}\n"
+    },
+    {
+      "command": "python scripts/ai_quality_eval.py --base-url http://127.0.0.1:18080 --rounds 20 --timeout-seconds 65",
+      "exit_code": 0,
+      "duration_seconds": 19.799,
+      "output": "{\"total\": 200, \"ok\": 200, \"fail\": 0, \"quality_pass_rate\": 100.0, \"avg_cost\": 0.098, \"issue_counter\": {}}\nreport=docs\\recovery_reports\\ai_quality_eval_20260423_154236.json\n"
+    },
+    {
+      "command": "python scripts/ai_customer_loop_test.py --base-url http://127.0.0.1:18080 --rounds 8 --workers 8 --timeout-seconds 50",
+      "exit_code": 0,
+      "duration_seconds": 111.12,
+      "output": "{\"sessions_total\": 200, \"sessions_ok\": 200, \"sessions_fail\": 0, \"turn_total\": 208, \"turn_ok\": 208, \"turn_fail\": 0, \"p50\": 0.712, \"p90\": 10.031, \"p95\": 15.808, \"max\": 45.444, \"avg\": 3.635, \"proxy_fallback\": 8, \"low_info_fast_path\": 16, \"global_query_fast_path\": 15, \"store_ops_fast_path\": 40, \"write_command_fast_path\": 0, \"proxy_reason_counter\": {\"ai_timeout\": 8}, \"category_summary\": {\"crm\": {\"sessions\": 16, \"session_ok\": 16, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 1.448}, \"knowledge\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 0.77}, \"ops\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 1.723}, \"robustness\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 45.25}, \"sales\": {\"sessions\": 40, \"session_ok\": 40, \"turn_total\": 40, \"turn_ok\": 40, \"turn_fail\": 0, \"p95\": 10.208}, \"service\": {\"sessions\": 40, \"session_ok\": 40, \"turn_total\": 40, \"turn_ok\": 40, \"turn_fail\": 0, \"p95\": 10.216}, \"write_intent\": {\"sessions\": 32, \"session_ok\": 32, \"turn_total\": 32, \"turn_ok\": 32, \"turn_fail\": 0, \"p95\": 10.446}}}\nreport=docs\\recovery_reports\\ai_customer_loop_test_20260423_154427.json\n"
+    },
+    {
+      "command": "python scripts/ai_customer_loop_test.py --base-url http://127.0.0.1:18080 --rounds 8 --workers 24 --timeout-seconds 50",
+      "exit_code": 0,
+      "duration_seconds": 130.344,
+      "output": "{\"sessions_total\": 200, \"sessions_ok\": 200, \"sessions_fail\": 0, \"turn_total\": 208, \"turn_ok\": 208, \"turn_fail\": 0, \"p50\": 2.938, \"p90\": 45.762, \"p95\": 46.375, \"max\": 47.992, \"avg\": 11.421, \"proxy_fallback\": 30, \"low_info_fast_path\": 16, \"global_query_fast_path\": 14, \"store_ops_fast_path\": 35, \"write_command_fast_path\": 0, \"proxy_reason_counter\": {\"ai_timeout\": 30}, \"category_summary\": {\"crm\": {\"sessions\": 16, \"session_ok\": 16, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 24.193}, \"knowledge\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 45.159}, \"ops\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 45.293}, \"robustness\": {\"sessions\": 24, \"session_ok\": 24, \"turn_total\": 24, \"turn_ok\": 24, \"turn_fail\": 0, \"p95\": 46.141}, \"sales\": {\"sessions\": 40, \"session_ok\": 40, \"turn_total\": 40, \"turn_ok\": 40, \"turn_fail\": 0, \"p95\": 46.081}, \"service\": {\"sessions\": 40, \"session_ok\": 40, \"turn_total\": 40, \"turn_ok\": 40, \"turn_fail\": 0, \"p95\": 24.244}, \"write_intent\": {\"sessions\": 32, \"session_ok\": 32, \"turn_total\": 32, \"turn_ok\": 32, \"turn_fail\": 0, \"p95\": 46.375}}}\nreport=docs\\recovery_reports\\ai_customer_loop_test_20260423_154638.json\n"
+    },
+    {
+      "command": "python scripts/ai_brutal_test.py --base-url http://127.0.0.1:18080 --total 400 --workers 40 --timeout-seconds 50",
+      "exit_code": 0,
+      "duration_seconds": 35.677,
+      "output": "{\"total\": 400, \"ok\": 400, \"fail\": 0, \"p50\": 2.23, \"p90\": 6.575, \"p95\": 7.496, \"max\": 10.327, \"avg\": 3.368, \"low_info_fast_path\": 27, \"llm_overload_fallback\": 0}\nreport=docs\\recovery_reports\\ai_brutal_test_20260423_154713.json\n"
+    },
+    {
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ai_chaos_test.ps1",
+      "exit_code": 0,
+      "duration_seconds": 238.815,
+      "output": "[0/6] Baseline check\n[1/6] Inject ollama unreachable\ntime=\"2026-04-23T15:48:01+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ocr_vl-1 Running \n Container infra-ai-1 Recreate \n Container infra-ai-1 Recreated \n Container infra-ai-1 Starting \n Container infra-ai-1 Started \n[2/6] Inject forced recovery mode\ntime=\"2026-04-23T15:48:12+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ocr_vl-1 Running \n Container infra-ai-1 Recreate \n Container infra-ai-1 Recreated \n Container infra-ai-1 Starting \n Container infra-ai-1 Started \n[3/6] Restore normal AI\ntime=\"2026-04-23T15:48:23+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ocr_vl-1 Running \n Container infra-ai-1 Running \n[4/6] Inject redis stop\ntime=\"2026-04-23T15:48:31+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-redis-1 Stopping \n Container infra-redis-1 Stopped \ntime=\"2026-04-23T15:49:16+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-redis-1 Starting \n Container infra-redis-1 Started \n[5/6] Inject bff stop and run guard recovery\ntime=\"2026-04-23T15:49:22+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-bff-1 Stopping \n Container infra-bff-1 Stopped \n[Guard] Running pre-check alert...\n[Guard] Alert retry 1/2 after warm-up...\n[Guard] Alert failed, starting recovery workflow...\ntime=\"2026-04-23T15:49:47+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ai-1 Restarting \n Container infra-ai-1 Started \ntime=\"2026-04-23T15:50:01+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-bff-1 Restarting \n Container infra-bff-1 Started \ntime=\"2026-04-23T15:50:02+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ai-1 Restarting \n Container infra-ai-1 Started \n[Guard] Running post-recovery alert...\n[Guard] Recovery completed successfully.\n[6/6] Final restore and report\ntime=\"2026-04-23T15:51:02+08:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"\n Container infra-ocr_vl-1 Running \n Container infra-redis-1 Running \n Container infra-db-1 Running \n Container infra-ai-1 Running \n Container infra-odoo-1 Running \n Container infra-bff-1 Running \nChaos report: docs\\recovery_reports\\ai_chaos_test_20260423_155112.json\n"
+    }
+  ],
+  "reports": {
+    "quality_report": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\docs/recovery_reports\\ai_quality_eval_20260423_154236.json",
+    "loop_report_8": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\docs/recovery_reports\\ai_customer_loop_test_20260423_154427.json",
+    "loop_report_24": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\docs/recovery_reports\\ai_customer_loop_test_20260423_154638.json",
+    "brutal_report": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\docs/recovery_reports\\ai_brutal_test_20260423_154713.json",
+    "chaos_report": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\docs/recovery_reports\\ai_chaos_test_20260423_155112.json"
+  },
+  "conversation_checks": {
+    "checks": [
+      {
+        "check": "memory_recall",
+        "message": "请记住客户王磊车牌京A12345",
+        "ok": true,
+        "status": 200,
+        "cost": 0.094,
+        "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "fact_guard_triggered": true,
+          "query_domains": [
+            "vehicle",
+            "store_ops",
+            "customer"
+          ],
+          "primary_domain": "customer"
+        }
+      },
+      {
+        "check": "memory_recall",
+        "message": "告诉我这个客户车牌是什么",
+        "ok": true,
+        "status": 200,
+        "cost": 0.125,
+        "response_preview": "根据最近会话记忆，这位客户关联车牌是 京A12345。",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "memory_anchor_fast_path": true,
+          "query_domains": [
+            "customer",
+            "vehicle",
+            "store_ops"
+          ],
+          "primary_domain": "customer"
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "系统里有哪些宝马车型",
+        "ok": true,
+        "status": 200,
+        "cost": 0.126,
+        "response_preview": "系统里当前记录的宝马车型包括：\n- 宝马 C 400（2019-2025年，350cc，都市出行系列）\n- 宝马 CE-02（2024-2024年，都市出行系列）\n- 宝马 CE 04（2023-2025年，都市出行系列）\n- 宝马 F 800 GS（2008-2025年，900cc，探险系列）\n- 宝马 F 850 GS（2020-2023年，850cc，探险系列）\n- 宝马 F 900 GS（2025-2025年，900cc，探险系",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "global_query_fast_path": true,
+          "query_domains": [
+            "catalog",
+            "vehicle"
+          ],
+          "primary_domain": "catalog"
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "今天门店最应该先盯什么",
+        "ok": true,
+        "status": 200,
+        "cost": 0.108,
+        "response_preview": "今天门店最值得先盯的有这几类：待交付 7 台、待施工 14 台、施工中 12 台、超期 207 台、加急 1 台。\n待交付优先关注：苏AM9371、沪B900XR、京AM1045、川AM1044、粤AM1043。\n待施工优先关注：TEST1234、苏AM9371、浙AN4008、沪B900XR、沪AM1032。\n施工中优先关注：川A8MT88、京ARR01、苏AM9371、浙AN4008、沪AM1040。\n下一步建议：\n1. 先处理待交",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "store_ops_fast_path": true,
+          "query_domains": [
+            "store_ops"
+          ],
+          "primary_domain": "store_ops"
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "报价待确认的工单有哪些",
+        "ok": true,
+        "status": 200,
+        "cost": 0.168,
+        "response_preview": "可以，先只给步骤不落库。新建工单建议准备：\n1. 关联对象：客户或车牌\n2. 必填：主诉/故障现象\n3. 推荐：优先级、预约时间、里程\n4. 可选：初检记录（电压、胎压、外观）\n你发给我后，我先生成工单草稿供你确认。",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "write_guidance_fast_path": true,
+          "query_domains": [
+            "work_order",
+            "store_ops"
+          ],
+          "primary_domain": "work_order"
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "某辆摩托车后刹异响一般先检查什么",
+        "ok": true,
+        "status": 200,
+        "cost": 0.142,
+        "response_preview": "后刹异响可先按这个顺序快检：\n1. 先排安全：刹车是否发软、跑偏、制动力明显下降\n2. 看刹车片厚度和磨损是否不均、是否到报警片\n3. 查刹车盘：是否有明显沟槽、偏摆、过热变色\n4. 清洁并检查卡钳导向销/回位是否卡滞\n5. 检查后轮轴承与轮胎异常，排除非制动噪音\n如果你给我车型和年份，我可以再细化到更具体检查点。",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "common_service_fast_path": true,
+          "query_domains": [
+            "vehicle",
+            "knowledge"
+          ],
+          "primary_domain": "vehicle"
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "我要新建工单，需要哪些信息，先只给步骤",
+        "ok": true,
+        "status": 200,
+        "cost": 0.124,
+        "response_preview": "可以直接建工单，但还缺车牌或故障描述。你可以直接说：给这台车新建工单，故障描述 冷启动困难，怠速不稳。",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "fast_path_used": true,
+          "write_command_fast_path": true,
+          "query_domains": [
+            "work_order",
+            "knowledge"
+          ],
+          "primary_domain": "knowledge",
+          "write_intent_detected": true,
+          "write_action": "create_work_order",
+          "write_missing_fields": [
+            "description"
+          ]
+        }
+      },
+      {
+        "check": "long_conversation",
+        "message": "我刚才问了什么重点，给我总结三条",
+        "ok": true,
+        "status": 200,
+        "cost": 0.271,
+        "response_preview": "最近这段对话的重点大致是：\n1. 你问了“今天门店最应该先盯什么”，当前记录里的结论是：今天门店最值得先盯的有这几类：待交付 7 台、待施工 14 台、施工中 12 台、超期 207 台、加急 1 台。 待交付优先关注：苏AM9371、沪B900XR、京AM1045、川AM1044、粤AM1043。 待施工优先关注：TEST1\n2. 你问了“报价待确认的工单有哪些”，当前记录里的结论是：可以，先只给步骤不落库。新建工单建议准备： 1. ",
+        "debug": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "fallback_model": "qwen3:4b",
+          "context_window_tokens": 40960,
+          "memory_summary_used": true,
+          "memory_summary_chars": 0
+        }
+      }
+    ],
+    "summary": {
+      "memory_recall_ok": true,
+      "long_conversation_ok": true,
+      "total_checks": 8,
+      "passed": 8,
+      "failed": 0
+    }
+  },
+  "gate": {
+    "quality_pass_rate_ge_95": true,
+    "loop8_zero_fail": true,
+    "loop24_zero_fail": true,
+    "brutal_zero_fail": true,
+    "chaos_pass": true,
+    "memory_recall_pass": true,
+    "long_conversation_pass": true,
+    "overall_pass": true
+  },
+  "snapshots": {
+    "quality_summary": {
+      "total": 200,
+      "ok": 200,
+      "fail": 0,
+      "quality_pass_rate": 100.0,
+      "avg_cost": 0.098,
+      "issue_counter": {}
+    },
+    "loop8_summary": {
+      "sessions_total": 200,
+      "sessions_ok": 200,
+      "sessions_fail": 0,
+      "turn_total": 208,
+      "turn_ok": 208,
+      "turn_fail": 0,
+      "p50": 0.712,
+      "p90": 10.031,
+      "p95": 15.808,
+      "max": 45.444,
+      "avg": 3.635,
+      "proxy_fallback": 8,
+      "low_info_fast_path": 16,
+      "global_query_fast_path": 15,
+      "store_ops_fast_path": 40,
+      "write_command_fast_path": 0,
+      "proxy_reason_counter": {
+        "ai_timeout": 8
+      },
+      "category_summary": {
+        "crm": {
+          "sessions": 16,
+          "session_ok": 16,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 1.448
+        },
+        "knowledge": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 0.77
+        },
+        "ops": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 1.723
+        },
+        "robustness": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 45.25
+        },
+        "sales": {
+          "sessions": 40,
+          "session_ok": 40,
+          "turn_total": 40,
+          "turn_ok": 40,
+          "turn_fail": 0,
+          "p95": 10.208
+        },
+        "service": {
+          "sessions": 40,
+          "session_ok": 40,
+          "turn_total": 40,
+          "turn_ok": 40,
+          "turn_fail": 0,
+          "p95": 10.216
+        },
+        "write_intent": {
+          "sessions": 32,
+          "session_ok": 32,
+          "turn_total": 32,
+          "turn_ok": 32,
+          "turn_fail": 0,
+          "p95": 10.446
+        }
+      }
+    },
+    "loop24_summary": {
+      "sessions_total": 200,
+      "sessions_ok": 200,
+      "sessions_fail": 0,
+      "turn_total": 208,
+      "turn_ok": 208,
+      "turn_fail": 0,
+      "p50": 2.938,
+      "p90": 45.762,
+      "p95": 46.375,
+      "max": 47.992,
+      "avg": 11.421,
+      "proxy_fallback": 30,
+      "low_info_fast_path": 16,
+      "global_query_fast_path": 14,
+      "store_ops_fast_path": 35,
+      "write_command_fast_path": 0,
+      "proxy_reason_counter": {
+        "ai_timeout": 30
+      },
+      "category_summary": {
+        "crm": {
+          "sessions": 16,
+          "session_ok": 16,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 24.193
+        },
+        "knowledge": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 45.159
+        },
+        "ops": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 45.293
+        },
+        "robustness": {
+          "sessions": 24,
+          "session_ok": 24,
+          "turn_total": 24,
+          "turn_ok": 24,
+          "turn_fail": 0,
+          "p95": 46.141
+        },
+        "sales": {
+          "sessions": 40,
+          "session_ok": 40,
+          "turn_total": 40,
+          "turn_ok": 40,
+          "turn_fail": 0,
+          "p95": 46.081
+        },
+        "service": {
+          "sessions": 40,
+          "session_ok": 40,
+          "turn_total": 40,
+          "turn_ok": 40,
+          "turn_fail": 0,
+          "p95": 24.244
+        },
+        "write_intent": {
+          "sessions": 32,
+          "session_ok": 32,
+          "turn_total": 32,
+          "turn_ok": 32,
+          "turn_fail": 0,
+          "p95": 46.375
+        }
+      }
+    },
+    "brutal_summary": {
+      "total": 400,
+      "ok": 400,
+      "fail": 0,
+      "p50": 2.23,
+      "p90": 6.575,
+      "p95": 7.496,
+      "max": 10.327,
+      "avg": 3.368,
+      "low_info_fast_path": 27,
+      "llm_overload_fallback": 0
+    },
+    "chaos_summary": {
+      "pass": 12,
+      "fail": 0,
+      "total": 12
+    }
+  }
+}

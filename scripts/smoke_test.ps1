@@ -1,5 +1,5 @@
 param(
-    [string]$BaseUrl = "http://localhost:8080",
+    [string]$BaseUrl = "http://localhost:18080",
     [string]$Username = "admin",
     [string]$Password = "change_me_now",
     [string]$StoreId = "default"

@@ -1,6 +1,19 @@
 ﻿<template>
   <div class="order-list">
     <div class="card">
+      <el-alert
+        v-if="pageError"
+        :title="pageError"
+        type="error"
+        show-icon
+        :closable="false"
+        class="page-alert"
+      >
+        <template #default>
+          <el-button text type="primary" @click="refresh">重新加载工单中心</el-button>
+        </template>
+      </el-alert>
+
       <div class="status-tabs">
         <el-tag
           v-for="item in quickStatusesLite"
@@ -41,7 +54,16 @@
         <span class="queue-pill">{{ `今日新接 ${todayCreatedCount}` }}</span>
       </div>
 
-      <el-table :data="orders" v-loading="loading" style="width: 100%" :row-class-name="orderRowClassName" @selection-change="onOrderSelectionChange" @row-dblclick="onOrderRowDblClick">
+      <el-table
+        :data="orders"
+        v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.orderList"
+        style="width: 100%"
+        :row-class-name="orderRowClassName"
+        @selection-change="onOrderSelectionChange"
+        @row-dblclick="onOrderRowDblClick"
+      >
         <el-table-column type="selection" width="44" />
         <el-table-column v-if="!simpleMode" prop="id" label="工单编号" min-width="220" />
         <el-table-column prop="vehicle_plate" label="车牌" width="130" />
@@ -421,7 +443,7 @@
                 </div>
               </div>
               <div class="minor-title">标准项目</div>
-              <el-table :data="servicePlan.standard_items" size="small" style="width: 100%">
+              <el-table :data="servicePlan.standard_items" size="small" :empty-text="EMPTY_TEXT.standardItems" style="width: 100%">
                 <el-table-column prop="service_name" label="项目" min-width="170" />
                 <el-table-column prop="labor_hours" label="工时" width="80" />
                 <el-table-column prop="suggested_price" label="建议价" width="100" />
@@ -445,7 +467,7 @@
 
             <div>
               <div class="minor-title">本工单已选项目</div>
-              <el-table :data="servicePlan.selected_items" size="small" style="width: 100%">
+              <el-table :data="servicePlan.selected_items" size="small" :empty-text="EMPTY_TEXT.selectedItems" style="width: 100%">
                 <el-table-column prop="service_name" label="项目" min-width="170" />
                 <el-table-column prop="parts_total" label="配件费" width="90" />
                 <el-table-column prop="labor_price" label="工时费" width="90" />
@@ -1061,6 +1083,8 @@ import { useRoute, useRouter } from 'vue-router'
 import request from '../utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const orders = ref([])
 const loading = ref(false)
@@ -1081,6 +1105,7 @@ const customerVehicles = ref([])
 const vehicleBrandOptions = ref([])
 const vehicleModelOptionsByBrand = ref({})
 const intakeMode = ref('existing')
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 const selectedOrderIds = ref([])
 const pinnedOrderIds = ref([])
 const pendingOpenOrderId = ref('')
@@ -2212,6 +2237,7 @@ const refresh = async () => {
   loading.value = true
   try {
     const res = await request.get('/mp/workorders/list/page', { params: { page: pagination.page, size: pagination.size, status: filters.status || '', customer_id: filters.customer_id || '', plate: filters.plate || '' } })
+    clearPageError()
     const rows = res.items || []
     const pinned = rows.filter((row) => pinnedOrderIds.value.includes(row.id))
     const normal = rows.filter((row) => !pinnedOrderIds.value.includes(row.id))
@@ -2219,6 +2245,9 @@ const refresh = async () => {
     pagination.total = res.total || 0
     await loadStatusCounts()
     await handlePendingOrderFocus()
+  } catch (error) {
+    setPageError('加载工单中心失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载工单中心失败')
   } finally { loading.value = false }
 }
 const resetFilters = () => { filters.status = ''; filters.customer_id = ''; filters.plate = ''; activeStatus.value = ''; pagination.page = 1; router.replace({ query: {} }) }

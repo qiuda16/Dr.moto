@@ -1,7 +1,9 @@
 import os
 import uuid
 import pytest
+from datetime import datetime
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ODOO_URL", "http://localhost:8069")
@@ -20,6 +22,8 @@ from app.models import (
     AppSetting,
     PaymentLedger,
     PartCatalogItem,
+    Procedure,
+    Vehicle,
     VehicleCatalogModel,
     VehicleKnowledgeDocument,
     VehicleServiceTemplateItem,
@@ -67,6 +71,17 @@ client = TestClient(app)
 redis_client = FakeRedis()
 rate_limit.redis_client = redis_client
 Base.metadata.create_all(bind=engine)
+with engine.begin() as conn:
+    for ddl in [
+        "ALTER TABLE app_settings ADD COLUMN document_header_note VARCHAR(255)",
+        "ALTER TABLE app_settings ADD COLUMN customer_document_footer_note VARCHAR(255)",
+        "ALTER TABLE app_settings ADD COLUMN internal_document_footer_note VARCHAR(255)",
+        "ALTER TABLE app_settings ADD COLUMN default_service_advice VARCHAR(255)",
+    ]:
+        try:
+            conn.execute(text(ddl))
+        except Exception:
+            pass
 
 
 def _clear_login_rate_limit():
@@ -101,6 +116,7 @@ def test_app_settings_get_and_update():
     assert settings_payload["store_id"] == store_id
     assert settings_payload["store_name"] == "机车博士"
     assert settings_payload["brand_name"] == "DrMoto"
+    assert settings_payload["document_header_note"] == "摩托车售后服务专业单据"
 
     update_payload = {
         "store_name": "机车博士旗舰店",
@@ -109,6 +125,10 @@ def test_app_settings_get_and_update():
         "primary_color": "#2B7FFF",
         "default_labor_price": 98,
         "default_delivery_note": "已完成交车说明，请按期复检。",
+        "document_header_note": "机车博士售后服务标准单据",
+        "customer_document_footer_note": "客户签字前请核对本次项目与金额。",
+        "internal_document_footer_note": "仅供门店内部留档与责任追溯使用。",
+        "default_service_advice": "建议客户按保养周期复检并关注轮胎和制动状态。",
         "common_complaint_phrases": ["更换机油机滤", "检查刹车与轮胎状态"],
     }
     update_resp = client.put("/mp/settings", headers=headers, json=update_payload)
@@ -118,6 +138,10 @@ def test_app_settings_get_and_update():
     assert updated["sidebar_badge_text"] == "售后管理"
     assert updated["primary_color"] == "#2B7FFF"
     assert updated["default_labor_price"] == 98
+    assert updated["document_header_note"] == "机车博士售后服务标准单据"
+    assert updated["customer_document_footer_note"] == "客户签字前请核对本次项目与金额。"
+    assert updated["internal_document_footer_note"] == "仅供门店内部留档与责任追溯使用。"
+    assert updated["default_service_advice"] == "建议客户按保养周期复检并关注轮胎和制动状态。"
     assert updated["common_complaint_phrases"] == ["更换机油机滤", "检查刹车与轮胎状态"]
 
 
@@ -226,6 +250,60 @@ def test_seed_baseline_services_uses_store_default_labor_price():
     finally:
         db.close()
 
+
+def test_customer_document_html_uses_store_settings():
+    store_id = f"store-doc-{uuid.uuid4().hex[:8]}"
+    db = SessionLocal()
+    try:
+        db.add(
+            AppSetting(
+                store_id=store_id,
+                store_name="机车博士华东店",
+                brand_name="DrMoto",
+                sidebar_badge_text="门店管理",
+                primary_color="#409EFF",
+                default_labor_price=88,
+                default_delivery_note="默认交车备注",
+                document_header_note="高性能摩托车服务单据",
+                customer_document_footer_note="客户确认无误后签字留存。",
+                internal_document_footer_note="内部质检追溯专用。",
+                default_service_advice="请客户按保养周期回店复检。",
+                common_complaint_phrases_json=["常规保养"],
+            )
+        )
+        db.commit()
+        branding = work_orders_router._resolve_document_branding(db, store_id)
+    finally:
+        db.close()
+
+    html = work_orders_router._render_customer_document_html_clean(
+        "quote",
+        "报价单",
+        WorkOrder(
+            uuid=f"wo-doc-{uuid.uuid4()}",
+            store_id=store_id,
+            customer_id="1",
+            vehicle_plate="TEST-001",
+            description="常规保养",
+            status="quoted",
+            created_at=datetime(2026, 4, 20, 10, 30),
+        ),
+        {
+            "name": "WO-2026-001",
+            "customer_id": [1, "张三"],
+            "vehicle_plate": "TEST-001",
+            "description": "常规保养",
+        },
+        selected_items=[],
+        delivery_checklist={},
+        store_settings=branding,
+    )
+
+    assert "机车博士华东店" in html
+    assert "高性能摩托车服务单据" in html
+    assert "客户确认无误后签字留存。" in html
+    assert "请客户按保养周期回店复检。" in html
+
 def test_auth_login():
     _clear_login_rate_limit()
     response = client.post("/auth/token", data={"username": "admin", "password": "change_me_now"}, headers={"Content-Type": "application/x-www-form-urlencoded"})
@@ -250,6 +328,21 @@ def test_health_probes():
 
     ready = client.get("/health/ready")
     assert ready.status_code in {200, 503}
+
+
+def test_rejects_oversized_request_by_content_length():
+    response = client.post(
+        "/auth/token",
+        data={"username": "admin", "password": "change_me_now"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": str(10 * 1024 * 1024),
+        },
+    )
+    assert response.status_code == 413
+    body = response.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "REQUEST_ENTITY_TOO_LARGE"
 
 
 def test_work_order_actions_and_invalid_transition():
@@ -619,3 +712,45 @@ def test_knowledge_document_search_prioritizes_exact_title():
     items = resp.json()
     assert items
     assert items[0]["title"] == title
+
+
+def test_catalog_model_manual_creation_backfills_vehicle_stub():
+    headers = _admin_headers("store-a")
+    db = SessionLocal()
+    try:
+        model = VehicleCatalogModel(
+            brand="Kawasaki",
+            model_name=f"Versys Test {uuid.uuid4().hex[:4]}",
+            year_from=2025,
+            year_to=2026,
+            displacement_cc=649,
+            category="ADV",
+            is_active=True,
+        )
+        db.add(model)
+        db.commit()
+        db.refresh(model)
+        model_id = model.id
+    finally:
+        db.close()
+
+    resp = client.post(
+        f"/mp/knowledge/catalog-models/{model_id}/procedures",
+        headers=headers,
+        json={"name": "Oil Change", "description": "Create procedure for catalog-only model"},
+    )
+    assert resp.status_code == 200
+    procedure_id = resp.json()["id"]
+
+    db = SessionLocal()
+    try:
+        vehicle = db.query(Vehicle).filter(Vehicle.key == f"CATALOG_MODEL:{model_id}").first()
+        assert vehicle is not None
+        assert vehicle.make == "Kawasaki"
+        assert vehicle.model.startswith("Versys Test")
+
+        procedure = db.query(Procedure).filter(Procedure.id == procedure_id).first()
+        assert procedure is not None
+        assert procedure.vehicle_key == f"CATALOG_MODEL:{model_id}"
+    finally:
+        db.close()

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CustomerWechatLoginRequest(BaseModel):
@@ -162,6 +162,7 @@ class CustomerHomeSummaryResponse(BaseModel):
     pending_recommendations: int = 0
     latest_order_status: Optional[str] = None
     latest_measured_at: Optional[datetime] = None
+    inspection_items: list[dict[str, Any]] = Field(default_factory=list)
 
     model_config = {
         "json_schema_extra": {
@@ -171,6 +172,7 @@ class CustomerHomeSummaryResponse(BaseModel):
                 "pending_recommendations": 3,
                 "latest_order_status": "done",
                 "latest_measured_at": "2026-03-30T10:00:00+08:00",
+                "inspection_items": [],
             }
         }
     }
@@ -221,3 +223,81 @@ class CustomerSubscriptionPrefUpsert(BaseModel):
             }
         }
     }
+
+
+class CustomerAppointmentDraftCreate(BaseModel):
+    vehicle_id: Optional[int] = None
+    subject: str
+    service_kind: Optional[str] = None
+    source: Optional[str] = "mini_program"
+    preferred_date: Optional[datetime] = None
+    notes: Optional[str] = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAppointmentDraftResponse(BaseModel):
+    id: int
+    store_id: str
+    partner_id: int
+    vehicle_id: Optional[int] = None
+    vehicle_plate: Optional[str] = None
+    subject: str
+    service_kind: Optional[str] = None
+    source: Optional[str] = None
+    preferred_date: Optional[datetime] = None
+    notes: Optional[str] = None
+    status: str = "draft"
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class CustomerAiChatRequest(BaseModel):
+    message: str
+    vehicle_id: Optional[int] = None
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAiChatResponse(BaseModel):
+    response: str
+    suggested_actions: list[str] = Field(default_factory=list)
+    action_cards: list[dict[str, Any]] = Field(default_factory=list)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    debug: Optional[dict[str, Any]] = None
+    vehicle_id: Optional[int] = None
+    health_state: Optional[str] = None
+
+
+class CustomerAiContextResponse(BaseModel):
+    vehicle_id: Optional[int] = None
+    selected_vehicle_id: Optional[int] = None
+    vehicle: Optional[dict[str, Any]] = None
+    vehicles: list[dict[str, Any]] = Field(default_factory=list)
+    health_state: str = "unknown"
+    health_summary: dict[str, Any] = Field(default_factory=dict)
+    inspection_items: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_services: list[dict[str, Any]] = Field(default_factory=list)
+    knowledge_docs: list[dict[str, Any]] = Field(default_factory=list)
+    shop_items: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CustomerShopProductResponse(BaseModel):
+    product_type: str
+    id: int
+    name: str
+    code: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    stock_qty: Optional[float] = None
+    is_recommended: bool = False
+    compatible_model_ids: list[int] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerShopProductListResponse(BaseModel):
+    items: list[CustomerShopProductResponse] = Field(default_factory=list)
+
+
+class CustomerShopProductDetailResponse(BaseModel):
+    item: CustomerShopProductResponse

@@ -1,0 +1,92 @@
+{
+  "time": "2026-04-23 16:27:44",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "rounds": 8,
+    "workers": 24,
+    "timeout_seconds": 50,
+    "scenario_count": 25,
+    "seed": 20260423
+  },
+  "summary": {
+    "sessions_total": 200,
+    "sessions_ok": 200,
+    "sessions_fail": 0,
+    "turn_total": 208,
+    "turn_ok": 208,
+    "turn_fail": 0,
+    "p50": 4.047,
+    "p90": 45.885,
+    "p95": 46.457,
+    "max": 48.665,
+    "avg": 11.936,
+    "proxy_fallback": 51,
+    "low_info_fast_path": 16,
+    "global_query_fast_path": 13,
+    "store_ops_fast_path": 29,
+    "write_command_fast_path": 0,
+    "proxy_reason_counter": {
+      "ai_timeout": 32,
+      "bff_proxy_overloaded": 19
+    },
+    "category_summary": {
+      "crm": {
+        "sessions": 16,
+        "session_ok": 16,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 45.89
+      },
+      "knowledge": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 45.698
+      },
+      "ops": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 45.553
+      },
+      "robustness": {
+        "sessions": 24,
+        "session_ok": 24,
+        "turn_total": 24,
+        "turn_ok": 24,
+        "turn_fail": 0,
+        "p95": 46.184
+      },
+      "sales": {
+        "sessions": 40,
+        "session_ok": 40,
+        "turn_total": 40,
+        "turn_ok": 40,
+        "turn_fail": 0,
+        "p95": 45.602
+      },
+      "service": {
+        "sessions": 40,
+        "session_ok": 40,
+        "turn_total": 40,
+        "turn_ok": 40,
+        "turn_fail": 0,
+        "p95": 46.497
+      },
+      "write_intent": {
+        "sessions": 32,
+        "session_ok": 32,
+        "turn_total": 32,
+        "turn_ok": 32,
+        "turn_fail": 0,
+        "p95": 46.434
+      }
+    }
+  },
+  "fail_samples": []
+}

@@ -1,0 +1,50 @@
+{
+  "time": "2026-04-26 16:40:52",
+  "profiles": [
+    {
+      "profile": "S1",
+      "requests": 30,
+      "workers": 3,
+      "timeout": 60,
+      "ok": 0,
+      "fail": 30,
+      "pass_rate": 0.0,
+      "p50": 0,
+      "p90": 0,
+      "p95": 0,
+      "max": 0,
+      "timeout_fail": 30,
+      "duration": 600.17
+    },
+    {
+      "profile": "S2",
+      "requests": 60,
+      "workers": 6,
+      "timeout": 60,
+      "ok": 0,
+      "fail": 60,
+      "pass_rate": 0.0,
+      "p50": 0,
+      "p90": 0,
+      "p95": 0,
+      "max": 0,
+      "timeout_fail": 60,
+      "duration": 600.21
+    },
+    {
+      "profile": "S3",
+      "requests": 90,
+      "workers": 9,
+      "timeout": 60,
+      "ok": 0,
+      "fail": 90,
+      "pass_rate": 0.0,
+      "p50": 0,
+      "p90": 0,
+      "p95": 0,
+      "max": 0,
+      "timeout_fail": 90,
+      "duration": 600.18
+    }
+  ]
+}

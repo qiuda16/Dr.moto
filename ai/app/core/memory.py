@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 try:
     import redis
@@ -22,6 +22,9 @@ MEMORY_BACKEND = os.getenv("AI_MEMORY_BACKEND", "redis").strip().lower()
 MEMORY_REDIS_URL = os.getenv("AI_MEMORY_REDIS_URL", "redis://redis:6379/1").strip()
 MEMORY_KEEP_RECENT_TURNS = int(os.getenv("AI_MEMORY_KEEP_RECENT_TURNS", "12"))
 MEMORY_MAX_TURNS = int(os.getenv("AI_MEMORY_MAX_TURNS", "20"))
+MEMORY_WARM_NOTES_MAX = int(os.getenv("AI_MEMORY_WARM_NOTES_MAX", "80"))
+MEMORY_WORKING_BUFFER_MAX = int(os.getenv("AI_MEMORY_WORKING_BUFFER_MAX", "60"))
+MEMORY_COLD_FACTS_MAX = int(os.getenv("AI_MEMORY_COLD_FACTS_MAX", "32"))
 
 
 def _extract_generic_fact_tags(question: str, answer: str) -> list[str]:
@@ -38,7 +41,8 @@ def _extract_generic_fact_tags(question: str, answer: str) -> list[str]:
         if value:
             tags.append(f"fact_round:{value}")
 
-    if any(token in str(question or "") for token in ["记住", "记一下", "记着", "记下来", "remember"]):
+    normalized_question = str(question or "").lower()
+    if any(token in normalized_question for token in ["记住", "记一下", "记着", "记下来", "remember"]):
         compact_question = _compact_text(question)[:160]
         if compact_question:
             tags.append(f"fact_note:{compact_question}")
@@ -92,13 +96,83 @@ def _save_file_store(payload: dict[str, Any]) -> None:
 
 def _normalize_user_payload(payload: Any) -> dict[str, Any]:
     if isinstance(payload, list):
-        return {"summary": "", "turns": payload}
+        return {
+            "summary": "",
+            "turns": payload,
+            "warm_notes": [],
+            "cold_facts": {},
+            "working_buffer": [],
+        }
     if isinstance(payload, dict):
         return {
             "summary": _compact_text(payload.get("summary")),
             "turns": list(payload.get("turns") or []),
+            "warm_notes": list(payload.get("warm_notes") or []),
+            "cold_facts": dict(payload.get("cold_facts") or {}),
+            "working_buffer": list(payload.get("working_buffer") or []),
         }
-    return {"summary": "", "turns": []}
+    return {"summary": "", "turns": [], "warm_notes": [], "cold_facts": {}, "working_buffer": []}
+
+
+def _safe_json_compact(value: Any, max_chars: int = 1000) -> str:
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        text = _compact_text(str(value))
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1] + "…"
+
+
+def _upsert_cold_fact(cold_facts: dict[str, Any], key: str, value: str) -> None:
+    normalized_key = _compact_text(key)
+    normalized_value = _compact_text(value)
+    if not normalized_key or not normalized_value:
+        return
+    cold_facts[normalized_key] = {
+        "value": normalized_value[:240],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _update_cold_facts(cold_facts: dict[str, Any], memory_item: dict[str, Any]) -> dict[str, Any]:
+    result = dict(cold_facts or {})
+    tags = [_compact_text(tag) for tag in (memory_item.get("tags") or []) if _compact_text(tag)]
+    for tag in tags:
+        lower = tag.lower()
+        if lower.startswith("customer_id:"):
+            _upsert_cold_fact(result, "customer_id", tag.split(":", 1)[-1])
+        elif lower.startswith("fact_code:"):
+            _upsert_cold_fact(result, "fact_code", tag.split(":", 1)[-1])
+        elif lower.startswith("fact_round:"):
+            _upsert_cold_fact(result, "fact_round", tag.split(":", 1)[-1])
+        elif lower.startswith("fact_note:"):
+            _upsert_cold_fact(result, "fact_note", tag.split(":", 1)[-1])
+        elif re.fullmatch(r"[A-Z0-9-]{5,16}", tag.upper()) and any(ch.isdigit() for ch in tag):
+            _upsert_cold_fact(result, "plate", tag)
+        elif len(tag) >= 32 and tag.count("-") >= 4:
+            _upsert_cold_fact(result, "work_order_id", tag)
+
+    question = _compact_text(memory_item.get("question"))
+    answer = _compact_text(memory_item.get("answer"))
+    for source in [question, answer]:
+        if not source:
+            continue
+        work_order_match = re.search(r"\b[0-9a-f]{8}-[0-9a-f-]{27,}\b", source.lower())
+        if work_order_match:
+            _upsert_cold_fact(result, "work_order_id", work_order_match.group(0))
+        code_match = re.search(r"\b([A-Z]{2,}-\d{4,})\b", source.upper())
+        if code_match:
+            _upsert_cold_fact(result, "fact_code", code_match.group(1))
+
+    if len(result) > MEMORY_COLD_FACTS_MAX:
+        ordered = sorted(
+            result.items(),
+            key=lambda item: _compact_text((item[1] or {}).get("updated_at")),
+            reverse=True,
+        )
+        result = dict(ordered[:MEMORY_COLD_FACTS_MAX])
+    return result
 
 
 def _load_user_memory(user_id: str) -> dict[str, Any]:
@@ -204,20 +278,44 @@ def recall_memory_anchor(user_id: str) -> dict[str, str]:
         return {}
 
     anchor: dict[str, str] = {}
+    ignored_tag_prefixes = ("fact_", "knowledge_", "project_", "source_", "type:")
+    ignored_exact_tags = {
+        "kb",
+        "knowledge",
+        "business_context",
+        "catalog",
+        "store_ops",
+        "work_order",
+        "customer",
+        "vehicle",
+    }
     for item in reversed(turns):
         for tag in item.get("tags") or []:
             value = _compact_text(tag)
             if not value:
                 continue
             lower = value.lower()
+            if lower in ignored_exact_tags or lower.startswith(ignored_tag_prefixes):
+                continue
             if not anchor.get("customer_id") and lower.startswith("customer_id:"):
                 parsed = value.split(":", 1)[-1].strip()
                 if parsed.isdigit():
                     anchor["customer_id"] = parsed
             elif not anchor.get("work_order_id") and len(lower) >= 32 and lower.count("-") >= 4:
                 anchor["work_order_id"] = value
-            elif not anchor.get("plate") and any(ch.isdigit() for ch in value) and len(value) <= 16:
-                anchor["plate"] = value
+            elif not anchor.get("plate"):
+                upper_value = value.upper()
+                is_cn_plate = bool(
+                    re.fullmatch(
+                        r"[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-Z0-9]{4,6}",
+                        upper_value,
+                    )
+                )
+                is_generic_plate = bool(
+                    re.fullmatch(r"[A-Z0-9-]{5,16}", upper_value) and any(ch.isdigit() for ch in upper_value)
+                )
+                if is_cn_plate or is_generic_plate:
+                    anchor["plate"] = value
             elif not anchor.get("customer_name"):
                 anchor["customer_name"] = value
         if anchor.get("work_order_id") or anchor.get("plate") or anchor.get("customer_id"):
@@ -253,16 +351,25 @@ def remember_session_turn(
     user_id: str,
     question: str,
     answer: str,
-    business_context: dict[str, Any] | None = None,
-    sources: list[dict[str, Any]] | None = None,
+    business_context: Optional[dict[str, Any]] = None,
+    sources: Optional[list[dict[str, Any]]] = None,
 ) -> None:
     if not user_id:
         return
 
     matched_customer = ((business_context or {}).get("matched_customer") or {}).get("name")
     matched_customer_id = ((business_context or {}).get("matched_customer") or {}).get("id")
-    matched_vehicle = ((business_context or {}).get("matched_vehicle") or {}).get("license_plate") or ((business_context or {}).get("matched_vehicle") or {}).get("vehicle_plate")
+    matched_vehicle = ((business_context or {}).get("matched_vehicle") or {}).get("license_plate") or (
+        (business_context or {}).get("matched_vehicle") or {}
+    ).get("vehicle_plate")
     matched_work_order = ((business_context or {}).get("matched_work_order") or {}).get("id")
+    if not matched_customer:
+        customer_match = re.search(
+            r"(?:客户|车主)\s*[:：]?\s*([A-Za-z\u4e00-\u9fa5]{2,12})(?:的|[，,\s。]|$)",
+            str(question or ""),
+        )
+        if customer_match:
+            matched_customer = customer_match.group(1)
     if not matched_work_order:
         answer_match = re.search(r"\b[0-9a-f]{8}-[0-9a-f-]{27,}\b", str(answer or "").lower())
         if answer_match:
@@ -271,6 +378,13 @@ def remember_session_turn(
         plate_match = re.search(
             r"[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-Z0-9]{4,6}",
             str(answer or "").upper(),
+        )
+        if plate_match:
+            matched_vehicle = plate_match.group(0)
+    if not matched_vehicle:
+        plate_match = re.search(
+            r"[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-Z0-9]{4,6}",
+            str(question or "").upper(),
         )
         if plate_match:
             matched_vehicle = plate_match.group(0)
@@ -296,6 +410,8 @@ def remember_session_turn(
 
     payload = _load_user_memory(user_id)
     history = list(payload.get("turns") or [])
+    warm_notes = [_compact_text(item) for item in (payload.get("warm_notes") or []) if _compact_text(item)]
+    cold_facts = dict(payload.get("cold_facts") or {})
     history.append(memory_item)
     history = history[-MEMORY_MAX_TURNS:]
 
@@ -303,6 +419,72 @@ def remember_session_turn(
         archived = history[:-MEMORY_KEEP_RECENT_TURNS]
         history = history[-MEMORY_KEEP_RECENT_TURNS:]
         payload["summary"] = _merge_summary(payload.get("summary", ""), archived)
+        for item in archived:
+            question = _compact_text(item.get("question"))[:80]
+            answer = _compact_text(item.get("answer"))[:120]
+            if question or answer:
+                warm_notes.append(f"{question} => {answer}".strip(" =>"))
 
     payload["turns"] = history
+    payload["warm_notes"] = warm_notes[-MEMORY_WARM_NOTES_MAX:]
+    payload["cold_facts"] = _update_cold_facts(cold_facts, memory_item)
     _save_user_memory(user_id, payload)
+
+
+def remember_working_event(
+    user_id: str,
+    event: str,
+    *,
+    status: str = "ok",
+    payload: Optional[dict[str, Any]] = None,
+) -> None:
+    if not user_id or not _compact_text(event):
+        return
+    memory_payload = _load_user_memory(user_id)
+    buffer = list(memory_payload.get("working_buffer") or [])
+    buffer.append(
+        {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "event": _compact_text(event)[:80],
+            "status": _compact_text(status, "ok")[:40],
+            "payload": _safe_json_compact(payload or {}, max_chars=1000),
+        }
+    )
+    memory_payload["working_buffer"] = buffer[-MEMORY_WORKING_BUFFER_MAX:]
+    _save_user_memory(user_id, memory_payload)
+
+
+def recall_memory_tiers(
+    user_id: str,
+    *,
+    hot_limit: int = 4,
+    warm_limit: int = 6,
+    cold_limit: int = 12,
+    buffer_limit: int = 6,
+) -> dict[str, Any]:
+    if not user_id:
+        return {"hot": [], "warm": [], "cold": [], "working_buffer": []}
+    payload = _load_user_memory(user_id)
+    hot_items = list(payload.get("turns") or [])[-max(1, hot_limit) :]
+    warm_items = [_compact_text(item) for item in (payload.get("warm_notes") or []) if _compact_text(item)]
+    working_buffer = list(payload.get("working_buffer") or [])[-max(1, buffer_limit) :]
+    cold_raw = dict(payload.get("cold_facts") or {})
+    ordered_cold = sorted(
+        cold_raw.items(),
+        key=lambda item: _compact_text((item[1] or {}).get("updated_at")),
+        reverse=True,
+    )
+    cold_items = []
+    for key, item in ordered_cold[: max(1, cold_limit)]:
+        if not isinstance(item, dict):
+            continue
+        value = _compact_text(item.get("value"))
+        if not value:
+            continue
+        cold_items.append({"key": _compact_text(key), "value": value, "updated_at": _compact_text(item.get("updated_at"))})
+    return {
+        "hot": hot_items,
+        "warm": warm_items[-max(1, warm_limit) :],
+        "cold": cold_items,
+        "working_buffer": working_buffer,
+    }

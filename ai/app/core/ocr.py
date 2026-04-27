@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import io
 import logging
@@ -10,20 +12,29 @@ from typing import Any
 import requests
 from pypdf import PdfReader, PdfWriter
 
+from .openclaw_models import call_openclaw_json
+
 logger = logging.getLogger("ai.ocr")
 
 OCR_SERVICE_URL = os.getenv("OCR_SERVICE_URL", "http://ocr_vl:8080").rstrip("/")
 OCR_SERVICE_TIMEOUT_SECONDS = int(os.getenv("OCR_SERVICE_TIMEOUT_SECONDS", "1800"))
 OCR_PDF_BATCH_PAGES = max(1, int(os.getenv("OCR_PDF_BATCH_PAGES", "4")))
 BFF_URL = os.getenv("BFF_URL", "").rstrip("/")
+MANUAL_PARSE_MODE = os.getenv("MANUAL_PARSE_MODE", "ai_native").strip().lower()
+MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK = os.getenv("MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 LLM_CLASSIFIER_ENABLED = os.getenv("OCR_LLM_CLASSIFIER_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
-LLM_PROVIDER = os.getenv("OCR_LLM_PROVIDER", "openai").strip().lower()
+LLM_PROVIDER = os.getenv("OCR_LLM_PROVIDER", "openclaw").strip().lower()
 LLM_API_URL = os.getenv("OCR_LLM_API_URL", "").rstrip("/")
 LLM_MODEL = os.getenv("OCR_LLM_MODEL", "")
 LLM_API_KEY = os.getenv("OCR_LLM_API_KEY", "")
 LLM_TIMEOUT_SECONDS = int(os.getenv("OCR_LLM_TIMEOUT_SECONDS", "120"))
 
-PARSER_VERSION = "paddleocr-vl-technician-v2"
+PARSER_VERSION = "ai-native-manual-parser-v1"
 
 SECTION_LABELS = {"doc_title", "paragraph_title", "section_title", "title"}
 OPERATION_KEYWORDS = (
@@ -1314,10 +1325,14 @@ def _guess_page_type(text: str, sections: list[dict[str, Any]] | None = None) ->
 
 
 def _call_llm_json(system_prompt: str, user_prompt: str) -> dict[str, Any] | None:
-    if not (LLM_CLASSIFIER_ENABLED and LLM_API_URL and LLM_MODEL):
+    if not LLM_CLASSIFIER_ENABLED:
         return None
     try:
+        if LLM_PROVIDER == "openclaw":
+            return call_openclaw_json(system_prompt, user_prompt, temperature=0.0, max_tokens=1200)
         if LLM_PROVIDER == "ollama":
+            if not (LLM_API_URL and LLM_MODEL):
+                return None
             response = requests.post(
                 f"{LLM_API_URL}/api/chat",
                 json={
@@ -1336,6 +1351,8 @@ def _call_llm_json(system_prompt: str, user_prompt: str) -> dict[str, Any] | Non
             data = response.json()
             content = ((data.get("message") or {}).get("content") or "").strip()
         else:
+            if not (LLM_API_URL and LLM_MODEL):
+                return None
             headers = {"Content-Type": "application/json"}
             if LLM_API_KEY:
                 headers["Authorization"] = f"Bearer {LLM_API_KEY}"
@@ -1798,7 +1815,7 @@ def _normalize_paddle_service_result(payload: dict[str, Any], page_offset: int =
 
     return {
         "status": "completed",
-        "provider": "paddleocr-vl-service",
+        "provider": "ai-native-parser",
         "parser_version": PARSER_VERSION,
         "page_count": len(pages),
         "summary": summary,
@@ -1852,7 +1869,7 @@ def _merge_parse_results(results: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "status": "completed",
-        "provider": "paddleocr-vl-service",
+        "provider": "ai-native-parser",
         "parser_version": PARSER_VERSION,
         "page_count": len(merged_pages),
         "summary": summary,
@@ -2271,14 +2288,136 @@ def _call_paddle_service(
     return _normalize_paddle_service_result(response.json())
 
 
+def _safe_decode_text(file_bytes: bytes) -> str:
+    for encoding in ("utf-8", "utf-16", "gb18030", "latin1"):
+        try:
+            text = file_bytes.decode(encoding, errors="strict")
+            if text:
+                return text
+        except Exception:
+            continue
+    return file_bytes.decode("utf-8", errors="ignore")
+
+
+def _native_extract_text_pages(
+    file_bytes: bytes,
+    filename: str,
+    content_type: str | None = None,
+) -> list[dict[str, Any]]:
+    normalized_name = str(filename or "").lower()
+    normalized_type = str(content_type or "").lower()
+    is_pdf = normalized_name.endswith(".pdf") or normalized_type == "application/pdf"
+    pages: list[dict[str, Any]] = []
+
+    if is_pdf:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        for index, page in enumerate(reader.pages, start=1):
+            extracted = ""
+            try:
+                extracted = page.extract_text() or ""
+            except Exception:
+                extracted = ""
+            pages.append({"page_number": index, "text": _clean_text(extracted)})
+        return pages
+
+    raw_text = _safe_decode_text(file_bytes)
+    if raw_text.strip():
+        parts = [part.strip() for part in re.split(r"\n\s*\n", raw_text) if part.strip()]
+        if not parts:
+            parts = [raw_text]
+        for index, part in enumerate(parts, start=1):
+            pages.append({"page_number": index, "text": _clean_text(part)})
+    return pages
+
+
+def _build_result_from_native_pages(pages: list[dict[str, Any]]) -> dict[str, Any]:
+    parsed_pages: list[dict[str, Any]] = []
+    for item in pages:
+        page_number = int(item.get("page_number") or (len(parsed_pages) + 1))
+        page_text = _clean_text(item.get("text") or "")
+        layout_like = {"markdown": {"text": page_text}}
+        parsed_page = _build_page_from_layout_result(layout_like, page_number)
+        parsed_pages.append(parsed_page)
+
+    sections: list[dict[str, Any]] = []
+    specs: list[dict[str, Any]] = []
+    procedures: list[dict[str, Any]] = []
+    for page in parsed_pages:
+        sections.extend(page.get("sections") or [])
+        specs.extend(page.get("specs") or [])
+        procedures.extend(page.get("procedures") or [])
+
+    seen_sections: set[str] = set()
+    unique_sections: list[dict[str, Any]] = []
+    for section in sections:
+        title = str(section.get("title") or "").strip()
+        if not title or title in seen_sections:
+            continue
+        seen_sections.add(title)
+        unique_sections.append(section)
+
+    seen_specs: set[tuple[str, str, str]] = set()
+    unique_specs: list[dict[str, Any]] = []
+    for spec in specs:
+        key = (str(spec.get("type") or ""), str(spec.get("value") or ""), str(spec.get("unit") or ""))
+        if key in seen_specs:
+            continue
+        seen_specs.add(key)
+        unique_specs.append(spec)
+
+    for index, procedure in enumerate(procedures, start=1):
+        procedure["step_order"] = index
+
+    summary = ""
+    for page in parsed_pages:
+        if page.get("summary"):
+            summary = str(page.get("summary") or "").strip()
+            break
+    if not summary:
+        summary = _clean_text(" ".join((page.get("text") or "")[:80] for page in parsed_pages[:3]))[:200]
+
+    return {
+        "status": "completed",
+        "provider": "ai-native-parser",
+        "parser_version": PARSER_VERSION,
+        "page_count": len(parsed_pages),
+        "summary": summary,
+        "sections": unique_sections,
+        "specs": unique_specs,
+        "procedures": procedures[:300],
+        "pages": parsed_pages,
+        "processed_batches": 1,
+        "total_batches": 1,
+    }
+
+
 def parse_document(
     file_bytes: bytes,
     filename: str,
     content_type: str | None = None,
     job_id: int | None = None,
 ) -> dict[str, Any]:
-    logger.info("Trying PaddleOCR-VL service at %s", OCR_SERVICE_URL)
-    result = _call_paddle_service(file_bytes, filename, content_type, job_id)
+    result: dict[str, Any]
+    parse_mode = MANUAL_PARSE_MODE
+    if parse_mode == "legacy_ocr":
+        logger.info("Manual parse mode=legacy_ocr, trying OCR service at %s", OCR_SERVICE_URL)
+        result = _call_paddle_service(file_bytes, filename, content_type, job_id)
+    else:
+        logger.info("Manual parse mode=%s, using AI-native parser (no OCR service)", parse_mode or "ai_native")
+        native_pages = _native_extract_text_pages(file_bytes, filename, content_type)
+        result = _build_result_from_native_pages(native_pages)
+        has_text = any(str((page or {}).get("text") or "").strip() for page in result.get("pages") or [])
+        if not has_text and MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK:
+            logger.warning(
+                "AI-native parser extracted empty text, falling back to legacy OCR service because fallback is enabled"
+            )
+            result = _call_paddle_service(file_bytes, filename, content_type, job_id)
+        elif not has_text:
+            logger.warning(
+                "AI-native parser extracted no text. Keep OCR fallback disabled by default. "
+                "If needed, set MANUAL_PARSE_ALLOW_LEGACY_OCR_FALLBACK=true."
+            )
+
     template_bundle = _build_manual_template_bundle(result)
     result.update(
         {

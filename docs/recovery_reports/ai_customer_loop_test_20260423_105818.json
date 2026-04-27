@@ -1,0 +1,472 @@
+{
+  "time": "2026-04-23 10:58:18",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "rounds": 4,
+    "workers": 8,
+    "timeout_seconds": 50,
+    "scenario_count": 25,
+    "seed": 20260423
+  },
+  "summary": {
+    "sessions_total": 100,
+    "sessions_ok": 0,
+    "sessions_fail": 100,
+    "turn_total": 104,
+    "turn_ok": 0,
+    "turn_fail": 104,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p95": 0.0,
+    "max": 0.0,
+    "avg": 0.0,
+    "proxy_fallback": 0,
+    "low_info_fast_path": 0,
+    "global_query_fast_path": 0,
+    "store_ops_fast_path": 0,
+    "write_command_fast_path": 0,
+    "category_summary": {
+      "crm": {
+        "sessions": 8,
+        "session_ok": 0,
+        "turn_total": 12,
+        "turn_ok": 0,
+        "turn_fail": 12,
+        "p95": 0.0
+      },
+      "knowledge": {
+        "sessions": 12,
+        "session_ok": 0,
+        "turn_total": 12,
+        "turn_ok": 0,
+        "turn_fail": 12,
+        "p95": 0.0
+      },
+      "ops": {
+        "sessions": 12,
+        "session_ok": 0,
+        "turn_total": 12,
+        "turn_ok": 0,
+        "turn_fail": 12,
+        "p95": 0.0
+      },
+      "robustness": {
+        "sessions": 12,
+        "session_ok": 0,
+        "turn_total": 12,
+        "turn_ok": 0,
+        "turn_fail": 12,
+        "p95": 0.0
+      },
+      "sales": {
+        "sessions": 20,
+        "session_ok": 0,
+        "turn_total": 20,
+        "turn_ok": 0,
+        "turn_fail": 20,
+        "p95": 0.0
+      },
+      "service": {
+        "sessions": 20,
+        "session_ok": 0,
+        "turn_total": 20,
+        "turn_ok": 0,
+        "turn_fail": 20,
+        "p95": 0.0
+      },
+      "write_intent": {
+        "sessions": 16,
+        "session_ok": 0,
+        "turn_total": 16,
+        "turn_ok": 0,
+        "turn_fail": 16,
+        "p95": 0.0
+      }
+    }
+  },
+  "fail_samples": [
+    {
+      "scenario": "sales_brand_catalog",
+      "category": "sales",
+      "session_user_id": "loop-0-7",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "系统里有哪些宝马车型",
+          "status": -1,
+          "ok": false,
+          "cost": 3.968715190887451,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_customer",
+      "category": "write_intent",
+      "session_user_id": "loop-0-5",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我想新增客户，需要提供哪些字段，先不要实际创建",
+          "status": -1,
+          "ok": false,
+          "cost": 3.9717023372650146,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "low_info_cn",
+      "category": "robustness",
+      "session_user_id": "loop-0-0",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "帮我查下",
+          "status": -1,
+          "ok": false,
+          "cost": 3.977741003036499,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_delivery_ready",
+      "category": "service",
+      "session_user_id": "loop-0-6",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "待交付车辆有哪些",
+          "status": -1,
+          "ok": false,
+          "cost": 3.971160411834717,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_oil_filter",
+      "category": "service",
+      "session_user_id": "loop-0-2",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "库存里有机油滤芯吗",
+          "status": -1,
+          "ok": false,
+          "cost": 3.9776535034179688,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_specific",
+      "category": "knowledge",
+      "session_user_id": "loop-0-4",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "宝马F900XR保养要点有哪些",
+          "status": -1,
+          "ok": false,
+          "cost": 3.9740147590637207,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "ops_priority",
+      "category": "ops",
+      "session_user_id": "loop-0-1",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "今天先盯什么，给我3条建议",
+          "status": -1,
+          "ok": false,
+          "cost": 3.981046199798584,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "crm_followup",
+      "category": "crm",
+      "session_user_id": "loop-0-3",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "请记住客户王磊车牌京A12345",
+          "status": -1,
+          "ok": false,
+          "cost": 3.9737191200256348,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        },
+        {
+          "turn_index": 1,
+          "message": "告诉我这个客户车牌是什么",
+          "status": -1,
+          "ok": false,
+          "cost": 0.009489774703979492,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_overdue",
+      "category": "service",
+      "session_user_id": "loop-0-8",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "超期工单有哪些，优先处理顺序是什么",
+          "status": -1,
+          "ok": false,
+          "cost": 0.009834051132202148,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "sales_today_focus",
+      "category": "sales",
+      "session_user_id": "loop-0-10",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "今天门店最应该先盯什么",
+          "status": -1,
+          "ok": false,
+          "cost": 0.00957179069519043,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "ambiguous_query",
+      "category": "robustness",
+      "session_user_id": "loop-0-12",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "看看",
+          "status": -1,
+          "ok": false,
+          "cost": 0.008550405502319336,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "low_info_en",
+      "category": "robustness",
+      "session_user_id": "loop-0-13",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "help me check",
+          "status": -1,
+          "ok": false,
+          "cost": 0.008550405502319336,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "ops_progress",
+      "category": "ops",
+      "session_user_id": "loop-0-14",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "施工中优先关注哪些车牌",
+          "status": -1,
+          "ok": false,
+          "cost": 0.0068967342376708984,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_brake_noise",
+      "category": "service",
+      "session_user_id": "loop-0-15",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "某辆摩托车后刹异响一般先检查什么",
+          "status": -1,
+          "ok": false,
+          "cost": 0.004660606384277344,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "ops_dashboard",
+      "category": "ops",
+      "session_user_id": "loop-0-16",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "门店总览里待施工、施工中、待交付分别多少",
+          "status": -1,
+          "ok": false,
+          "cost": 0.004317283630371094,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "sales_stock_plate",
+      "category": "sales",
+      "session_user_id": "loop-0-20",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "现在带交付的车牌号都是多少",
+          "status": -1,
+          "ok": false,
+          "cost": 0.0036194324493408203,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_status",
+      "category": "write_intent",
+      "session_user_id": "loop-0-17",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "如果要修改工单状态为待交付，应该怎么做",
+          "status": -1,
+          "ok": false,
+          "cost": 0.005275249481201172,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "sales_customer_stage",
+      "category": "sales",
+      "session_user_id": "loop-0-19",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "这个客户的工单现在到哪一步了",
+          "status": -1,
+          "ok": false,
+          "cost": 0.005269765853881836,
+          "error": "('Connection aborted.', ConnectionAbortedError(10053, '你的主机中的软件中止了一个已建立的连接。', None, 10053, None))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_quote_pending",
+      "category": "service",
+      "session_user_id": "loop-0-18",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "报价待确认的工单有哪些",
+          "status": -1,
+          "ok": false,
+          "cost": 0.005781888961791992,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_workorder",
+      "category": "write_intent",
+      "session_user_id": "loop-0-21",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我要新建工单，需要哪些信息，先只给步骤",
+          "status": -1,
+          "ok": false,
+          "cost": 0.004601478576660156,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_safety",
+      "category": "knowledge",
+      "session_user_id": "loop-0-22",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "更换刹车片前要先检查什么安全项",
+          "status": -1,
+          "ok": false,
+          "cost": 0.005650520324707031,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "crm_recent_orders",
+      "category": "crm",
+      "session_user_id": "loop-0-23",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "这个客户还有哪些工单",
+          "status": -1,
+          "ok": false,
+          "cost": 0.004625082015991211,
+          "error": "('Connection aborted.', ConnectionAbortedError(10053, '你的主机中的软件中止了一个已建立的连接。', None, 10053, None))"
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_quote",
+      "category": "write_intent",
+      "session_user_id": "loop-0-24",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+          "status": -1,
+          "ok": false,
+          "cost": 0.0046350955963134766,
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+        }
+      ]
+    },
+    {
+      "scenario": "service_delivery_ready",
+      "category": "service",
+      "session_user_id": "loop-1-27",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "待交付车辆有哪些",
+          "status": -1,
+          "ok": false,
+          "cost": 0.004365444183349609,
+          "error": "('Connection aborted.', ConnectionAbortedError(10053, '你的主机中的软件中止了一个已建立的连接。', None, 10053, None))"
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_specific",
+      "category": "knowledge",
+      "session_user_id": "loop-1-25",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "宝马F900XR保养要点有哪些",
+          "status": -1,
+          "ok": false,
+          "cost": 0.006420135498046875,
+          "error": "('Connection aborted.', ConnectionAbortedError(10053, '你的主机中的软件中止了一个已建立的连接。', None, 10053, None))"
+        }
+      ]
+    }
+  ]
+}

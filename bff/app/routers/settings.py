@@ -27,6 +27,10 @@ def _default_settings_payload(store_id: str) -> dict:
         "primary_color": "#409EFF",
         "default_labor_price": 80.0,
         "default_delivery_note": "已向客户说明施工内容，建议按期复检。",
+        "document_header_note": "摩托车售后服务专业单据",
+        "customer_document_footer_note": "请客户核对维修项目、金额与交车说明后签字确认。",
+        "internal_document_footer_note": "用于门店内部留档、责任追溯与施工复核。",
+        "default_service_advice": "建议客户按保养周期复检，并关注油液、制动与轮胎状态。",
         "common_complaint_phrases_json": list(DEFAULT_COMPLAINT_PHRASES),
         "updated_by": None,
     }
@@ -58,6 +62,10 @@ def _to_response(row: AppSetting) -> AppSettingsResponse:
         primary_color=row.primary_color,
         default_labor_price=row.default_labor_price,
         default_delivery_note=row.default_delivery_note,
+        document_header_note=row.document_header_note,
+        customer_document_footer_note=row.customer_document_footer_note,
+        internal_document_footer_note=row.internal_document_footer_note,
+        default_service_advice=row.default_service_advice,
         common_complaint_phrases=list(row.common_complaint_phrases_json or []),
         updated_by=row.updated_by,
     )
@@ -91,6 +99,10 @@ async def update_app_settings(
     row.primary_color = payload.primary_color
     row.default_labor_price = payload.default_labor_price
     row.default_delivery_note = payload.default_delivery_note
+    row.document_header_note = payload.document_header_note
+    row.customer_document_footer_note = payload.customer_document_footer_note
+    row.internal_document_footer_note = payload.internal_document_footer_note
+    row.default_service_advice = payload.default_service_advice
     row.common_complaint_phrases_json = payload.common_complaint_phrases
     row.updated_by = current_user.username
 
@@ -98,4 +110,3 @@ async def update_app_settings(
     db.commit()
     db.refresh(row)
     return _to_response(row)
-

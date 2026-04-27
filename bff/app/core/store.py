@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import Request
 
 from ..schemas.auth import User
@@ -5,7 +7,7 @@ from .config import settings
 from .text import compact_whitespace
 
 
-def resolve_store_id(request: Request | None, current_user: User | None = None) -> str:
+def resolve_store_id(request: Optional[Request], current_user: Optional[User] = None) -> str:
     candidate = None
     if request is not None:
         candidate = request.headers.get("X-Store-Id")

@@ -1,0 +1,171 @@
+{
+  "time": "2026-04-23 11:50:22",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "rounds": 6,
+    "case_count": 10,
+    "timeout_seconds": 65
+  },
+  "summary": {
+    "total": 60,
+    "ok": 54,
+    "fail": 6,
+    "quality_pass_rate": 90.0,
+    "avg_cost": 0.1,
+    "issue_counter": {
+      "write_guidance_weak": 6
+    }
+  },
+  "fail_samples": [
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 0,
+      "status": 200,
+      "cost": 0.15,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 1,
+      "status": 200,
+      "cost": 0.147,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 2,
+      "status": 200,
+      "cost": 0.105,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 3,
+      "status": 200,
+      "cost": 0.127,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 4,
+      "status": 200,
+      "cost": 0.106,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 5,
+      "status": 200,
+      "cost": 0.112,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    }
+  ]
+}

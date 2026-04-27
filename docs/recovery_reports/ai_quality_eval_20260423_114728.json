@@ -1,0 +1,584 @@
+{
+  "time": "2026-04-23 11:47:28",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "rounds": 10,
+    "case_count": 10,
+    "timeout_seconds": 65
+  },
+  "summary": {
+    "total": 100,
+    "ok": 29,
+    "fail": 71,
+    "quality_pass_rate": 29.0,
+    "avg_cost": 0.061,
+    "issue_counter": {
+      "repair_not_actionable": 3,
+      "write_guidance_weak": 3,
+      "request_exception": 65
+    }
+  },
+  "fail_samples": [
+    {
+      "case": "repair_brake_noise",
+      "ok": false,
+      "issues": [
+        "repair_not_actionable"
+      ],
+      "response_preview": "这条问题还缺定位对象。给我客户名、车牌或工单号任意一个，我就能直接给你当前状态和下一步建议。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "common_service_fast_path": true,
+        "query_domains": [
+          "vehicle",
+          "knowledge"
+        ],
+        "primary_domain": "vehicle",
+        "forced_entity_clarification": true
+      },
+      "round": 0,
+      "status": 200,
+      "cost": 0.08,
+      "message": "某辆摩托车后刹异响一般先检查什么"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 0,
+      "status": 200,
+      "cost": 0.193,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "repair_brake_noise",
+      "ok": false,
+      "issues": [
+        "repair_not_actionable"
+      ],
+      "response_preview": "这条问题还缺定位对象。给我客户名、车牌或工单号任意一个，我就能直接给你当前状态和下一步建议。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "common_service_fast_path": true,
+        "query_domains": [
+          "vehicle",
+          "knowledge"
+        ],
+        "primary_domain": "vehicle",
+        "forced_entity_clarification": true
+      },
+      "round": 1,
+      "status": 200,
+      "cost": 0.067,
+      "message": "某辆摩托车后刹异响一般先检查什么"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 1,
+      "status": 200,
+      "cost": 0.187,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "case": "repair_brake_noise",
+      "ok": false,
+      "issues": [
+        "repair_not_actionable"
+      ],
+      "response_preview": "这条问题还缺定位对象。给我客户名、车牌或工单号任意一个，我就能直接给你当前状态和下一步建议。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "common_service_fast_path": true,
+        "query_domains": [
+          "vehicle",
+          "knowledge"
+        ],
+        "primary_domain": "vehicle",
+        "forced_entity_clarification": true
+      },
+      "round": 2,
+      "status": 200,
+      "cost": 0.084,
+      "message": "某辆摩托车后刹异响一般先检查什么"
+    },
+    {
+      "case": "write_guidance_quote",
+      "ok": false,
+      "issues": [
+        "write_guidance_weak"
+      ],
+      "response_preview": "我这边还缺关键线索。你给我客户名、车牌或工单号中的任意一个，我就能继续往下查。",
+      "debug": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "fallback_model": "qwen3:4b",
+        "context_window_tokens": 40960,
+        "fast_path_used": true,
+        "fact_guard_triggered": true,
+        "query_domains": [
+          "work_order",
+          "store_ops"
+        ],
+        "primary_domain": "work_order"
+      },
+      "round": 2,
+      "status": 200,
+      "cost": 0.127,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段"
+    },
+    {
+      "round": 3,
+      "case": "repair_brake_noise",
+      "status": -1,
+      "cost": 0.002,
+      "message": "某辆摩托车后刹异响一般先检查什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 3,
+      "case": "repair_maintenance",
+      "status": -1,
+      "cost": 0.015,
+      "message": "摩托车保养一般包括哪些项目",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 3,
+      "case": "write_guidance_workorder",
+      "status": -1,
+      "cost": 0.002,
+      "message": "我要新建工单，需要哪些信息，先只给步骤",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 3,
+      "case": "write_guidance_quote",
+      "status": -1,
+      "cost": 0.014,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 3,
+      "case": "low_info",
+      "status": -1,
+      "cost": 0.016,
+      "message": "帮我查下",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "catalog_cn",
+      "status": -1,
+      "cost": 0.002,
+      "message": "系统里有哪些宝马车型",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "catalog_en",
+      "status": -1,
+      "cost": 0.013,
+      "message": "what bmw models are in the system",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "workorder_status",
+      "status": -1,
+      "cost": 0.002,
+      "message": "这个客户的工单现在到哪一步了",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "delivery_plates",
+      "status": -1,
+      "cost": 0.014,
+      "message": "现在带交付的车牌号都是多少",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "ops_focus",
+      "status": -1,
+      "cost": 0.002,
+      "message": "今天门店最应该先盯什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "repair_brake_noise",
+      "status": -1,
+      "cost": 0.013,
+      "message": "某辆摩托车后刹异响一般先检查什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "repair_maintenance",
+      "status": -1,
+      "cost": 0.002,
+      "message": "摩托车保养一般包括哪些项目",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "write_guidance_workorder",
+      "status": -1,
+      "cost": 0.013,
+      "message": "我要新建工单，需要哪些信息，先只给步骤",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "write_guidance_quote",
+      "status": -1,
+      "cost": 0.002,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 4,
+      "case": "low_info",
+      "status": -1,
+      "cost": 0.013,
+      "message": "帮我查下",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "catalog_cn",
+      "status": -1,
+      "cost": 0.003,
+      "message": "系统里有哪些宝马车型",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "catalog_en",
+      "status": -1,
+      "cost": 0.002,
+      "message": "what bmw models are in the system",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "workorder_status",
+      "status": -1,
+      "cost": 0.026,
+      "message": "这个客户的工单现在到哪一步了",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "delivery_plates",
+      "status": -1,
+      "cost": 0.003,
+      "message": "现在带交付的车牌号都是多少",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "ops_focus",
+      "status": -1,
+      "cost": 0.002,
+      "message": "今天门店最应该先盯什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "repair_brake_noise",
+      "status": -1,
+      "cost": 0.026,
+      "message": "某辆摩托车后刹异响一般先检查什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "repair_maintenance",
+      "status": -1,
+      "cost": 0.002,
+      "message": "摩托车保养一般包括哪些项目",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "write_guidance_workorder",
+      "status": -1,
+      "cost": 0.014,
+      "message": "我要新建工单，需要哪些信息，先只给步骤",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "write_guidance_quote",
+      "status": -1,
+      "cost": 0.015,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 5,
+      "case": "low_info",
+      "status": -1,
+      "cost": 0.002,
+      "message": "帮我查下",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "catalog_cn",
+      "status": -1,
+      "cost": 0.014,
+      "message": "系统里有哪些宝马车型",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "catalog_en",
+      "status": -1,
+      "cost": 0.015,
+      "message": "what bmw models are in the system",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "workorder_status",
+      "status": -1,
+      "cost": 0.002,
+      "message": "这个客户的工单现在到哪一步了",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "delivery_plates",
+      "status": -1,
+      "cost": 0.013,
+      "message": "现在带交付的车牌号都是多少",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "ops_focus",
+      "status": -1,
+      "cost": 0.002,
+      "message": "今天门店最应该先盯什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "repair_brake_noise",
+      "status": -1,
+      "cost": 0.013,
+      "message": "某辆摩托车后刹异响一般先检查什么",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "repair_maintenance",
+      "status": -1,
+      "cost": 0.003,
+      "message": "摩托车保养一般包括哪些项目",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "write_guidance_workorder",
+      "status": -1,
+      "cost": 0.002,
+      "message": "我要新建工单，需要哪些信息，先只给步骤",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    },
+    {
+      "round": 6,
+      "case": "write_guidance_quote",
+      "status": -1,
+      "cost": 0.025,
+      "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+      "ok": false,
+      "issues": [
+        "request_exception"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response',))"
+    }
+  ]
+}

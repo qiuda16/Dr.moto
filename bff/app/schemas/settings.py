@@ -8,6 +8,7 @@ STORE_NAME_MAX = 120
 BRAND_NAME_MAX = 80
 BADGE_TEXT_MAX = 40
 DELIVERY_NOTE_MAX = 255
+DOCUMENT_NOTE_MAX = 255
 HEX_COLOR_MAX = 32
 PHRASE_MAX = 120
 MAX_PHRASES = 12
@@ -20,6 +21,10 @@ class AppSettingsBase(BaseModel):
     primary_color: str = Field(default="#409EFF", max_length=HEX_COLOR_MAX)
     default_labor_price: Optional[float] = Field(default=80, ge=0)
     default_delivery_note: Optional[str] = Field(default="已向客户说明施工内容，建议按期复检。", max_length=DELIVERY_NOTE_MAX)
+    document_header_note: Optional[str] = Field(default="摩托车售后服务专业单据", max_length=DOCUMENT_NOTE_MAX)
+    customer_document_footer_note: Optional[str] = Field(default="请客户核对维修项目、金额与交车说明后签字确认。", max_length=DOCUMENT_NOTE_MAX)
+    internal_document_footer_note: Optional[str] = Field(default="用于门店内部留档、责任追溯与施工复核。", max_length=DOCUMENT_NOTE_MAX)
+    default_service_advice: Optional[str] = Field(default="建议客户按保养周期复检，并关注油液、制动与轮胎状态。", max_length=DOCUMENT_NOTE_MAX)
     common_complaint_phrases: list[str] = Field(default_factory=list, max_length=MAX_PHRASES)
 
     @field_validator("store_name", "brand_name")
@@ -30,7 +35,15 @@ class AppSettingsBase(BaseModel):
             raise ValueError("Field is required")
         return normalized
 
-    @field_validator("sidebar_badge_text", "default_delivery_note", mode="before")
+    @field_validator(
+        "sidebar_badge_text",
+        "default_delivery_note",
+        "document_header_note",
+        "customer_document_footer_note",
+        "internal_document_footer_note",
+        "default_service_advice",
+        mode="before",
+    )
     @classmethod
     def normalize_optional_text(cls, value):
         return normalize_text(value)
@@ -72,4 +85,3 @@ class AppSettingsUpdate(AppSettingsBase):
 class AppSettingsResponse(AppSettingsBase):
     store_id: str
     updated_by: Optional[str] = None
-

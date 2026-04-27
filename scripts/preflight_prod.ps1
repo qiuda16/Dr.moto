@@ -1,6 +1,6 @@
 param(
     [string]$ComposeFile = "infra/docker-compose.yml",
-    [string]$BaseUrl = "http://localhost:8080",
+    [string]$BaseUrl = "http://localhost:18080",
     [string]$AdminUsername = "admin",
     [string]$AdminPassword = "",
     [string]$ExpectedEnv = "",

@@ -1,4 +1,4 @@
-﻿export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:18080'
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://drmoto.cloud'
 
 export const TCB_ENV = import.meta.env.VITE_TCB_ENV || 'prod-9gbcay06c7c9a82b'
 export const TCB_SERVICE = import.meta.env.VITE_TCB_SERVICE || 'flask-i7ja'

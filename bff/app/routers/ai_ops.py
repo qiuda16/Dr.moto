@@ -1,13 +1,22 @@
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import re
+import time
 import uuid
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy import or_
+from sqlalchemy import MetaData, Table, create_engine, delete, insert, inspect, or_, select, update
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
 from ..core.audit import log_audit
@@ -17,6 +26,7 @@ from ..core.store import resolve_store_id
 from ..core.text import compact_whitespace, normalize_text
 from ..integrations.odoo import odoo_client
 from ..models import (
+    AuditLog,
     PartCatalogItem,
     PartCatalogProfile,
     Quote,
@@ -71,6 +81,13 @@ ALLOWED_WRITE_ACTIONS = [
     "create_quote_draft",
     "create_part",
     "update_part",
+    "database_schema",
+    "database_select",
+    "database_insert",
+    "database_update",
+    "database_delete_plan",
+    "database_delete_confirm",
+    "database_undo",
 ]
 
 
@@ -1037,6 +1054,462 @@ def _update_work_order_status(
     return {"work_order_id": work_order.uuid, "status": work_order.status}
 
 
+_DB_ENGINE_CACHE: dict[str, Engine] = {}
+_DB_DELETE_TOKEN_TTL_SECONDS = 600
+_DB_UNDO_ROW_LIMIT = 5000
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode("ascii")
+    return value
+
+
+def _target_database_name(target_database: str | None) -> str:
+    target = compact_whitespace(target_database or "bff").lower()
+    if target not in {"bff", "odoo"}:
+        raise HTTPException(status_code=400, detail="target_database must be bff or odoo")
+    return target
+
+
+def _engine_for_target_database(target_database: str | None) -> Engine:
+    target = _target_database_name(target_database)
+    if target in _DB_ENGINE_CACHE:
+        return _DB_ENGINE_CACHE[target]
+    if settings.DATABASE_URL.startswith("sqlite"):
+        if target != "bff":
+            raise HTTPException(status_code=400, detail="odoo target is unavailable for sqlite")
+        engine = create_engine(settings.DATABASE_URL)
+    else:
+        url = make_url(settings.DATABASE_URL)
+        database = "odoo" if target == "odoo" else (url.database or "bff")
+        engine = create_engine(
+            url.set(database=database),
+            pool_pre_ping=True,
+            pool_recycle=settings.DB_POOL_RECYCLE_SECONDS,
+            connect_args={"client_encoding": "utf8"} if settings.DATABASE_URL.startswith("postgresql") else {},
+        )
+    _DB_ENGINE_CACHE[target] = engine
+    return engine
+
+
+def _reflect_table(engine: Engine, table_name: str, schema: str | None = None) -> Table:
+    table = compact_whitespace(table_name)
+    if not table:
+        raise HTTPException(status_code=400, detail="table is required")
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names(schema=schema):
+        raise HTTPException(status_code=404, detail=f"table not found: {table}")
+    metadata = MetaData()
+    return Table(table, metadata, autoload_with=engine, schema=schema)
+
+
+def _normalize_columns(table: Table, requested: Any) -> list[Any]:
+    if requested in (None, "", ["*"], "*"):
+        return list(table.c)
+    if not isinstance(requested, list):
+        raise HTTPException(status_code=400, detail="columns must be a list or '*'")
+    result = []
+    for name in requested:
+        key = compact_whitespace(name)
+        if key not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown column: {key}")
+        result.append(table.c[key])
+    return result or list(table.c)
+
+
+def _build_where(table: Table, filters: Any) -> list[Any]:
+    if not filters:
+        return []
+    if not isinstance(filters, dict):
+        raise HTTPException(status_code=400, detail="filters must be an object")
+    clauses = []
+    for key, raw in filters.items():
+        column_name = compact_whitespace(key)
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown filter column: {column_name}")
+        column = table.c[column_name]
+        op = "eq"
+        value = raw
+        if isinstance(raw, dict):
+            op = compact_whitespace(raw.get("op") or "eq").lower()
+            value = raw.get("value")
+        if op == "eq":
+            clauses.append(column == value)
+        elif op == "ne":
+            clauses.append(column != value)
+        elif op == "gt":
+            clauses.append(column > value)
+        elif op == "gte":
+            clauses.append(column >= value)
+        elif op == "lt":
+            clauses.append(column < value)
+        elif op == "lte":
+            clauses.append(column <= value)
+        elif op == "like":
+            clauses.append(column.like(str(value or "")))
+        elif op == "ilike":
+            clauses.append(column.ilike(str(value or "")))
+        elif op == "in":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail=f"filter {column_name} requires list value")
+            clauses.append(column.in_(value))
+        elif op == "is_null":
+            clauses.append(column.is_(None) if bool(value) else column.is_not(None))
+        else:
+            raise HTTPException(status_code=400, detail=f"unsupported filter op: {op}")
+    return clauses
+
+
+def _validate_values(table: Table, values: Any) -> dict[str, Any]:
+    if not isinstance(values, dict) or not values:
+        raise HTTPException(status_code=400, detail="values must be a non-empty object")
+    cleaned: dict[str, Any] = {}
+    for key, value in values.items():
+        column_name = compact_whitespace(key)
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown value column: {column_name}")
+        cleaned[column_name] = value
+    return cleaned
+
+
+def _database_schema(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table_filter = compact_whitespace(payload.get("table"))
+    inspector = inspect(engine)
+    tables = []
+    for table_name in inspector.get_table_names(schema=schema):
+        if table_filter and table_name != table_filter:
+            continue
+        columns = [
+            {
+                "name": column["name"],
+                "type": str(column.get("type")),
+                "nullable": bool(column.get("nullable")),
+                "default": str(column.get("default")) if column.get("default") is not None else None,
+                "primary_key": bool(column.get("primary_key")),
+            }
+            for column in inspector.get_columns(table_name, schema=schema)
+        ]
+        tables.append({"table": table_name, "columns": columns})
+    return {"target_database": _target_database_name(payload.get("target_database")), "tables": tables}
+
+
+def _database_select(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    table = _reflect_table(engine, payload.get("table"), compact_whitespace(payload.get("schema")) or None)
+    columns = _normalize_columns(table, payload.get("columns"))
+    limit = min(max(int(payload.get("limit") or 50), 1), 500)
+    stmt = select(*columns).where(*_build_where(table, payload.get("filters"))).limit(limit)
+    order_by = compact_whitespace(payload.get("order_by"))
+    if order_by:
+        desc = order_by.startswith("-")
+        column_name = order_by[1:] if desc else order_by
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown order_by column: {column_name}")
+        stmt = stmt.order_by(table.c[column_name].desc() if desc else table.c[column_name].asc())
+    with engine.connect() as conn:
+        rows = [dict(row._mapping) for row in conn.execute(stmt).fetchall()]
+    return {
+        "target_database": _target_database_name(payload.get("target_database")),
+        "table": table.name,
+        "row_count": len(rows),
+        "rows": [{key: _json_safe(value) for key, value in row.items()} for row in rows],
+    }
+
+
+def _json_safe_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {key: _json_safe(value) for key, value in row.items()}
+
+
+def _primary_key_columns(table: Table) -> list[str]:
+    return [column.name for column in table.primary_key.columns]
+
+
+def _pk_filters_for_row(table: Table, row: dict[str, Any]) -> dict[str, Any]:
+    pk_columns = _primary_key_columns(table)
+    if not pk_columns:
+        raise HTTPException(status_code=400, detail=f"table {table.name} has no primary key; undo is unavailable")
+    missing = [name for name in pk_columns if name not in row]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"missing primary key values for undo: {', '.join(missing)}")
+    return {name: row[name] for name in pk_columns}
+
+
+def _select_rows_for_undo(conn: Any, table: Table, filters: Any, limit: int = _DB_UNDO_ROW_LIMIT) -> list[dict[str, Any]]:
+    stmt = select(*list(table.c)).where(*_build_where(table, filters)).limit(limit + 1)
+    rows = [dict(row._mapping) for row in conn.execute(stmt).fetchall()]
+    if len(rows) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"operation affects more than {limit} rows; narrow filters before using AI database write tools",
+        )
+    return rows
+
+
+def _build_pk_where(table: Table, row: dict[str, Any]) -> list[Any]:
+    return _build_where(table, _pk_filters_for_row(table, row))
+
+
+def _write_ai_ops_audit(
+    db: Session,
+    actor_id: str,
+    action: str,
+    target: dict[str, Any],
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+    store_id: str,
+) -> int | None:
+    try:
+        log = AuditLog(
+            store_id=store_id,
+            actor_id=actor_id,
+            action=f"ai_ops:{action}",
+            target_entity=json.dumps(target, ensure_ascii=True, sort_keys=True),
+            before_state=before,
+            after_state=after,
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        return int(log.id)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("AI ops database audit failed: %s", exc)
+        return None
+
+
+def _attach_database_audit(
+    result: dict[str, Any],
+    target_database: str,
+    schema: str | None,
+    table: Table,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+) -> dict[str, Any]:
+    result["_audit"] = {
+        "target": {
+            "target_database": target_database,
+            "schema": schema,
+            "table": table.name,
+        },
+        "before": before,
+        "after": after,
+    }
+    return result
+
+
+def _database_insert(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    target_database = _target_database_name(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table = _reflect_table(engine, payload.get("table"), schema)
+    values = _validate_values(table, payload.get("values"))
+    with engine.begin() as conn:
+        result = conn.execute(insert(table).values(**values))
+        pk = list(result.inserted_primary_key) if result.inserted_primary_key else []
+        inserted_rows: list[dict[str, Any]] = []
+        pk_columns = _primary_key_columns(table)
+        if pk and pk_columns and len(pk) == len(pk_columns):
+            inserted_rows = _select_rows_for_undo(conn, table, dict(zip(pk_columns, pk)), limit=1)
+    safe_rows = [_json_safe_row(row) for row in inserted_rows]
+    response = {"target_database": target_database, "table": table.name, "inserted_primary_key": [_json_safe(value) for value in pk]}
+    undo = {"type": "delete_inserted", "rows": safe_rows, "available": bool(safe_rows)}
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"payload": {"values": _json_safe_row(values)}},
+        after={**response, "inserted_rows": safe_rows, "undo": undo},
+    )
+
+
+def _database_update(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    target_database = _target_database_name(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table = _reflect_table(engine, payload.get("table"), schema)
+    if not _primary_key_columns(table):
+        raise HTTPException(status_code=400, detail=f"table {table.name} has no primary key; update undo is unavailable")
+    values = _validate_values(table, payload.get("values"))
+    filters = payload.get("filters")
+    if not filters and not bool(payload.get("allow_all")):
+        raise HTTPException(status_code=400, detail="filters are required for database_update unless allow_all=true")
+    with engine.begin() as conn:
+        before_rows = _select_rows_for_undo(conn, table, filters)
+        stmt = update(table).values(**values).where(*_build_where(table, filters))
+        result = conn.execute(stmt)
+    safe_before_rows = [_json_safe_row(row) for row in before_rows]
+    response = {"target_database": target_database, "table": table.name, "updated_rows": int(result.rowcount or 0)}
+    undo = {"type": "restore_updated", "rows": safe_before_rows, "available": bool(safe_before_rows)}
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"filters": payload.get("filters") or {}, "rows": safe_before_rows},
+        after={**response, "values": _json_safe_row(values), "undo": undo},
+    )
+
+
+def _delete_token_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "target_database": _target_database_name(payload.get("target_database")),
+        "schema": compact_whitespace(payload.get("schema")) or None,
+        "table": compact_whitespace(payload.get("table")),
+        "filters": payload.get("filters") or {},
+        "allow_all": bool(payload.get("allow_all")),
+    }
+
+
+def _sign_delete_payload(payload: dict[str, Any]) -> str:
+    token_payload = {**_delete_token_payload(payload), "exp": int(time.time()) + _DB_DELETE_TOKEN_TTL_SECONDS, "nonce": uuid.uuid4().hex}
+    raw = json.dumps(token_payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    sig = hmac.new(settings.SECRET_KEY.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    return base64.urlsafe_b64encode(raw).decode("ascii") + "." + sig
+
+
+def _verify_delete_token(token: str) -> dict[str, Any]:
+    try:
+        raw_b64, sig = str(token or "").split(".", 1)
+        raw = base64.urlsafe_b64decode(raw_b64.encode("ascii"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid delete confirmation token") from exc
+    expected = hmac.new(settings.SECRET_KEY.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=400, detail="invalid delete confirmation token signature")
+    payload = json.loads(raw.decode("utf-8"))
+    if int(payload.get("exp") or 0) < int(time.time()):
+        raise HTTPException(status_code=400, detail="delete confirmation token expired")
+    return payload
+
+
+def _database_delete_plan(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    token_payload = _delete_token_payload(payload)
+    table = _reflect_table(engine, token_payload["table"], token_payload.get("schema"))
+    if not token_payload["filters"] and not token_payload["allow_all"]:
+        raise HTTPException(status_code=400, detail="filters are required for delete unless allow_all=true")
+    count_stmt = select(table.c[list(table.c.keys())[0]]).where(*_build_where(table, token_payload["filters"])).limit(1000)
+    with engine.connect() as conn:
+        preview_rows = [dict(row._mapping) for row in conn.execute(count_stmt).fetchall()]
+    return {
+        **token_payload,
+        "risk_level": "critical",
+        "requires_confirmation": True,
+        "preview_row_count_limited": len(preview_rows),
+        "preview_rows": [{key: _json_safe(value) for key, value in row.items()} for row in preview_rows[:20]],
+        "confirmation_token": _sign_delete_payload(token_payload),
+        "expires_in_seconds": _DB_DELETE_TOKEN_TTL_SECONDS,
+    }
+
+
+def _database_delete_confirm(payload: dict[str, Any]) -> dict[str, Any]:
+    token_payload = _verify_delete_token(str(payload.get("confirmation_token") or ""))
+    engine = _engine_for_target_database(token_payload.get("target_database"))
+    table = _reflect_table(engine, token_payload["table"], token_payload.get("schema"))
+    if not token_payload["filters"] and not token_payload["allow_all"]:
+        raise HTTPException(status_code=400, detail="filters are required for delete unless allow_all=true")
+    with engine.begin() as conn:
+        before_rows = _select_rows_for_undo(conn, table, token_payload["filters"])
+        stmt = delete(table).where(*_build_where(table, token_payload["filters"]))
+        result = conn.execute(stmt)
+    safe_before_rows = [_json_safe_row(row) for row in before_rows]
+    response = {
+        "target_database": token_payload["target_database"],
+        "table": table.name,
+        "deleted_rows": int(result.rowcount or 0),
+    }
+    undo = {"type": "restore_deleted", "rows": safe_before_rows, "available": bool(safe_before_rows)}
+    return _attach_database_audit(
+        response,
+        token_payload["target_database"],
+        token_payload.get("schema"),
+        table,
+        before={"filters": token_payload["filters"], "rows": safe_before_rows},
+        after={**response, "undo": undo},
+    )
+
+
+def _database_undo(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
+    undo_id = int(payload.get("undo_id") or 0)
+    if undo_id <= 0:
+        raise HTTPException(status_code=400, detail="undo_id is required")
+
+    audit = db.query(AuditLog).filter(AuditLog.id == undo_id).first()
+    if not audit:
+        raise HTTPException(status_code=404, detail=f"audit log not found: {undo_id}")
+    if not str(audit.action or "").startswith("ai_ops:database_"):
+        raise HTTPException(status_code=400, detail="only AI database operations can be undone here")
+
+    after_state = audit.after_state if isinstance(audit.after_state, dict) else {}
+    undo = after_state.get("undo") if isinstance(after_state.get("undo"), dict) else None
+    if not undo or not undo.get("available"):
+        raise HTTPException(status_code=400, detail="this operation has no available undo snapshot")
+    if undo.get("undone_at"):
+        raise HTTPException(status_code=400, detail="this operation has already been undone")
+
+    target = json.loads(audit.target_entity or "{}")
+    target_database = _target_database_name(payload.get("target_database") or target.get("target_database"))
+    schema = compact_whitespace(payload.get("schema") or target.get("schema")) or None
+    table_name = compact_whitespace(payload.get("table") or target.get("table"))
+    engine = _engine_for_target_database(target_database)
+    table = _reflect_table(engine, table_name, schema)
+    rows = undo.get("rows") if isinstance(undo.get("rows"), list) else []
+    if len(rows) > _DB_UNDO_ROW_LIMIT:
+        raise HTTPException(status_code=400, detail=f"undo snapshot exceeds {_DB_UNDO_ROW_LIMIT} rows")
+
+    undo_type = compact_whitespace(undo.get("type"))
+    affected = 0
+    with engine.begin() as conn:
+        if undo_type == "delete_inserted":
+            for row in rows:
+                result = conn.execute(delete(table).where(*_build_pk_where(table, row)))
+                affected += int(result.rowcount or 0)
+        elif undo_type == "restore_updated":
+            for row in rows:
+                values = _validate_values(table, {key: value for key, value in row.items() if key in table.c})
+                result = conn.execute(update(table).values(**values).where(*_build_pk_where(table, row)))
+                affected += int(result.rowcount or 0)
+        elif undo_type == "restore_deleted":
+            for row in rows:
+                values = _validate_values(table, {key: value for key, value in row.items() if key in table.c})
+                conn.execute(insert(table).values(**values))
+                affected += 1
+        else:
+            raise HTTPException(status_code=400, detail=f"unsupported undo type: {undo_type}")
+
+    undo["undone_at"] = datetime.utcnow().isoformat() + "Z"
+    undo["undone_rows"] = affected
+    after_state["undo"] = undo
+    audit.after_state = after_state
+    db.add(audit)
+    db.commit()
+
+    response = {
+        "undo_id": undo_id,
+        "undone_action": audit.action,
+        "target_database": target_database,
+        "table": table.name,
+        "undo_type": undo_type,
+        "affected_rows": affected,
+    }
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"undo_id": undo_id, "original_action": audit.action, "undo": undo},
+        after=response,
+    )
+
+
 @router.post("/actions", response_model=AiActionResponse)
 async def execute_ai_action(
     payload: AiActionRequest,
@@ -1052,7 +1525,26 @@ async def execute_ai_action(
     result: dict[str, Any]
     risk_level = "low"
 
-    if action == "create_customer":
+    if action == "database_schema":
+        result = _database_schema(payload.payload)
+    elif action == "database_select":
+        result = _database_select(payload.payload)
+    elif action == "database_insert":
+        result = _database_insert(payload.payload)
+        risk_level = "high"
+    elif action == "database_update":
+        result = _database_update(payload.payload)
+        risk_level = "high"
+    elif action == "database_delete_plan":
+        result = _database_delete_plan(payload.payload)
+        risk_level = "critical"
+    elif action == "database_delete_confirm":
+        result = _database_delete_confirm(payload.payload)
+        risk_level = "critical"
+    elif action == "database_undo":
+        result = _database_undo(db, payload.payload)
+        risk_level = "critical"
+    elif action == "create_customer":
         customer = CustomerCreate(**payload.payload)
         new_id = odoo_client.execute_kw(
             "res.partner",
@@ -1212,13 +1704,31 @@ async def execute_ai_action(
         result = _part_to_response(row, profile)
         risk_level = "medium"
 
-    log_audit(
-        db,
-        actor_id=actor.username,
-        action=f"ai_ops:{action}",
-        target=json.dumps({"store_id": store_id}, ensure_ascii=True),
-        before=None,
-        after=result,
-        store_id=store_id,
-    )
+    database_audit = result.pop("_audit", None)
+    if database_audit:
+        audit_id = _write_ai_ops_audit(
+            db,
+            actor_id=actor.username,
+            action=action,
+            target={**database_audit["target"], "store_id": store_id},
+            before=database_audit.get("before"),
+            after=database_audit.get("after"),
+            store_id=store_id,
+        )
+        result["audit_id"] = audit_id
+        undo = (database_audit.get("after") or {}).get("undo")
+        if isinstance(undo, dict):
+            result["undo_available"] = bool(undo.get("available"))
+            if undo.get("available"):
+                result["undo_id"] = audit_id
+    else:
+        log_audit(
+            db,
+            actor_id=actor.username,
+            action=f"ai_ops:{action}",
+            target=json.dumps({"store_id": store_id}, ensure_ascii=True),
+            before=None,
+            after=result,
+            store_id=store_id,
+        )
     return {"status": "ok", "action": action, "result": result, "risk_level": risk_level}

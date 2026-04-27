@@ -1,0 +1,22 @@
+{
+  "time": "2026-04-22 11:35:40",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "total": 320,
+    "workers": 32,
+    "timeout_seconds": 35
+  },
+  "summary": {
+    "total": 320,
+    "ok": 320,
+    "fail": 0,
+    "p50": 3.85,
+    "p90": 4.423,
+    "p95": 4.528,
+    "max": 6.318,
+    "avg": 3.857,
+    "low_info_fast_path": 32,
+    "llm_overload_fallback": 0
+  },
+  "error_samples": []
+}

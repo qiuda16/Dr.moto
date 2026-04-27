@@ -1,0 +1,498 @@
+{
+  "time": "2026-04-23 10:34:53",
+  "base_url": "http://127.0.0.1:18080",
+  "config": {
+    "rounds": 20,
+    "workers": 4,
+    "timeout_seconds": 40,
+    "scenario_count": 25,
+    "seed": 20260423
+  },
+  "summary": {
+    "sessions_total": 500,
+    "sessions_ok": 417,
+    "sessions_fail": 83,
+    "turn_total": 520,
+    "turn_ok": 433,
+    "turn_fail": 87,
+    "p50": 23.904,
+    "p90": 28.389,
+    "p95": 28.503,
+    "max": 29.11,
+    "avg": 16.762,
+    "proxy_fallback": 202,
+    "low_info_fast_path": 21,
+    "global_query_fast_path": 28,
+    "store_ops_fast_path": 69,
+    "write_command_fast_path": 0,
+    "category_summary": {
+      "crm": {
+        "sessions": 40,
+        "session_ok": 33,
+        "turn_total": 60,
+        "turn_ok": 49,
+        "turn_fail": 11,
+        "p95": 28.463
+      },
+      "knowledge": {
+        "sessions": 60,
+        "session_ok": 50,
+        "turn_total": 60,
+        "turn_ok": 50,
+        "turn_fail": 10,
+        "p95": 28.323
+      },
+      "ops": {
+        "sessions": 60,
+        "session_ok": 50,
+        "turn_total": 60,
+        "turn_ok": 50,
+        "turn_fail": 10,
+        "p95": 28.955
+      },
+      "robustness": {
+        "sessions": 60,
+        "session_ok": 51,
+        "turn_total": 60,
+        "turn_ok": 51,
+        "turn_fail": 9,
+        "p95": 28.226
+      },
+      "sales": {
+        "sessions": 100,
+        "session_ok": 84,
+        "turn_total": 100,
+        "turn_ok": 84,
+        "turn_fail": 16,
+        "p95": 28.503
+      },
+      "service": {
+        "sessions": 100,
+        "session_ok": 83,
+        "turn_total": 100,
+        "turn_ok": 83,
+        "turn_fail": 17,
+        "p95": 28.538
+      },
+      "write_intent": {
+        "sessions": 80,
+        "session_ok": 66,
+        "turn_total": 80,
+        "turn_ok": 66,
+        "turn_fail": 14,
+        "p95": 28.421
+      }
+    }
+  },
+  "fail_samples": [
+    {
+      "scenario": "write_intent_workorder",
+      "category": "write_intent",
+      "session_user_id": "loop-16-17",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我要新建工单，需要哪些信息，先只给步骤",
+          "status": 401,
+          "ok": false,
+          "cost": 0.062317848205566406,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sales_stock_plate",
+      "category": "sales",
+      "session_user_id": "loop-16-18",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "现在带交付的车牌号都是多少",
+          "status": 401,
+          "ok": false,
+          "cost": 0.004301786422729492,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "service_quote_pending",
+      "category": "service",
+      "session_user_id": "loop-16-20",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "报价待确认的工单有哪些",
+          "status": 401,
+          "ok": false,
+          "cost": 0.11237311363220215,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "service_brake_noise",
+      "category": "service",
+      "session_user_id": "loop-16-21",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "某辆摩托车后刹异响一般先检查什么",
+          "status": 401,
+          "ok": false,
+          "cost": 0.11288166046142578,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "crm_followup",
+      "category": "crm",
+      "session_user_id": "loop-16-19",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "请记住客户王磊车牌京A12345",
+          "status": 401,
+          "ok": false,
+          "cost": 0.017532825469970703,
+          "response_preview": "",
+          "debug": {}
+        },
+        {
+          "turn_index": 1,
+          "message": "告诉我这个客户车牌是什么",
+          "status": 401,
+          "ok": false,
+          "cost": 0.11561250686645508,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "ops_dashboard",
+      "category": "ops",
+      "session_user_id": "loop-16-24",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "门店总览里待施工、施工中、待交付分别多少",
+          "status": 401,
+          "ok": false,
+          "cost": 0.0686194896697998,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_specific",
+      "category": "knowledge",
+      "session_user_id": "loop-16-23",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "宝马F900XR保养要点有哪些",
+          "status": 401,
+          "ok": false,
+          "cost": 0.0686194896697998,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_customer",
+      "category": "write_intent",
+      "session_user_id": "loop-16-22",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我想新增客户，需要提供哪些字段，先不要实际创建",
+          "status": 401,
+          "ok": false,
+          "cost": 0.0686194896697998,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "service_brake_noise",
+      "category": "service",
+      "session_user_id": "loop-17-25",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "某辆摩托车后刹异响一般先检查什么",
+          "status": 401,
+          "ok": false,
+          "cost": 0.056615352630615234,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sales_stock_plate",
+      "category": "sales",
+      "session_user_id": "loop-17-27",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "现在带交付的车牌号都是多少",
+          "status": 401,
+          "ok": false,
+          "cost": 0.0372319221496582,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "low_info_cn",
+      "category": "robustness",
+      "session_user_id": "loop-17-26",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "帮我查下",
+          "status": 401,
+          "ok": false,
+          "cost": 0.03774380683898926,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "service_quote_pending",
+      "category": "service",
+      "session_user_id": "loop-17-28",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "报价待确认的工单有哪些",
+          "status": 401,
+          "ok": false,
+          "cost": 0.0372319221496582,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_safety",
+      "category": "knowledge",
+      "session_user_id": "loop-17-29",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "更换刹车片前要先检查什么安全项",
+          "status": 401,
+          "ok": false,
+          "cost": 0.051676273345947266,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sales_customer_stage",
+      "category": "sales",
+      "session_user_id": "loop-17-30",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "这个客户的工单现在到哪一步了",
+          "status": 401,
+          "ok": false,
+          "cost": 0.07224416732788086,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_customer",
+      "category": "write_intent",
+      "session_user_id": "loop-17-32",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我想新增客户，需要提供哪些字段，先不要实际创建",
+          "status": 401,
+          "ok": false,
+          "cost": 0.07224416732788086,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sales_brand_catalog_en",
+      "category": "sales",
+      "session_user_id": "loop-17-31",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "what bmw models are in the system",
+          "status": 401,
+          "ok": false,
+          "cost": 0.07274889945983887,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_general",
+      "category": "knowledge",
+      "session_user_id": "loop-17-33",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "摩托车保养一般包括哪些项目",
+          "status": 401,
+          "ok": false,
+          "cost": 0.029073476791381836,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_status",
+      "category": "write_intent",
+      "session_user_id": "loop-17-36",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "如果要修改工单状态为待交付，应该怎么做",
+          "status": 401,
+          "ok": false,
+          "cost": 0.12723112106323242,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sales_brand_catalog",
+      "category": "sales",
+      "session_user_id": "loop-17-35",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "系统里有哪些宝马车型",
+          "status": 401,
+          "ok": false,
+          "cost": 0.12787485122680664,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_quote",
+      "category": "write_intent",
+      "session_user_id": "loop-17-34",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我要生成报价草稿，先告诉我你会写入什么字段",
+          "status": 401,
+          "ok": false,
+          "cost": 0.12787485122680664,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "ambiguous_query",
+      "category": "robustness",
+      "session_user_id": "loop-17-37",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "看看",
+          "status": 401,
+          "ok": false,
+          "cost": 0.12562799453735352,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "write_intent_workorder",
+      "category": "write_intent",
+      "session_user_id": "loop-17-39",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "我要新建工单，需要哪些信息，先只给步骤",
+          "status": 401,
+          "ok": false,
+          "cost": 0.034220218658447266,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "ops_dashboard",
+      "category": "ops",
+      "session_user_id": "loop-17-38",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "门店总览里待施工、施工中、待交付分别多少",
+          "status": 401,
+          "ok": false,
+          "cost": 0.034220218658447266,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "knowledge_specific",
+      "category": "knowledge",
+      "session_user_id": "loop-17-0",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "宝马F900XR保养要点有哪些",
+          "status": 401,
+          "ok": false,
+          "cost": 0.03371739387512207,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    },
+    {
+      "scenario": "ops_progress",
+      "category": "ops",
+      "session_user_id": "loop-17-4",
+      "fails": [
+        {
+          "turn_index": 0,
+          "message": "施工中优先关注哪些车牌",
+          "status": 401,
+          "ok": false,
+          "cost": 0.014662027359008789,
+          "response_preview": "",
+          "debug": {}
+        }
+      ]
+    }
+  ]
+}

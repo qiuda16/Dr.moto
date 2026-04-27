@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -19,12 +21,17 @@ from ..core.security import create_access_token
 from ..core.text import compact_whitespace, normalize_text
 from ..integrations.odoo import odoo_client
 from ..models import (
+    CustomerAppointmentDraft,
     CustomerAuthSession,
     CustomerSubscriptionPref,
     CustomerWechatBinding,
+    PartCatalogItem,
+    PartCatalogProfile,
     VehicleCatalogModel,
     VehicleHealthRecord,
     VehicleKnowledgeDocument,
+    VehicleServicePackage,
+    VehicleServicePackageItem,
     VehicleServiceTemplateItem,
     VehicleServiceTemplatePart,
     VehicleServiceTemplateProfile,
@@ -32,11 +39,18 @@ from ..models import (
 from ..schemas.mp_customer import (
     CustomerBindRequest,
     CustomerBindResponse,
+    CustomerAiChatRequest,
+    CustomerAiChatResponse,
+    CustomerAiContextResponse,
+    CustomerAppointmentDraftCreate,
+    CustomerAppointmentDraftResponse,
     CustomerHomeSummaryResponse,
     CustomerMaintenanceListResponse,
     CustomerProfileResponse,
     CustomerRefreshRequest,
     CustomerRefreshResponse,
+    CustomerShopProductDetailResponse,
+    CustomerShopProductListResponse,
     CustomerSubscriptionPrefUpsert,
     CustomerVehicleResponse,
     CustomerWechatLoginRequest,
@@ -879,3 +893,405 @@ async def customer_subscription_upsert(
         "prefer_channel": row.prefer_channel,
         "last_notified_at": row.last_notified_at,
     }
+
+
+def _resolve_vehicle_for_customer(vehicle_id: int | None, db: Session, ctx: dict[str, Any]) -> dict[str, Any] | None:
+    vehicles = _load_customer_vehicles(ctx["partner_id"], db)
+    if not vehicles:
+        return None
+    if vehicle_id:
+        return next((item for item in vehicles if item["id"] == vehicle_id), None)
+    return vehicles[0]
+
+
+def _build_inspection_items(latest: VehicleHealthRecord | None) -> list[dict[str, Any]]:
+    metrics = [
+        ("engine_rpm", "发动机转速", getattr(latest, "engine_rpm", None), "rpm"),
+        ("battery_voltage", "电瓶电压", getattr(latest, "battery_voltage", None), "V"),
+        ("tire_front_psi", "前胎压", getattr(latest, "tire_front_psi", None), "psi"),
+        ("tire_rear_psi", "后胎压", getattr(latest, "tire_rear_psi", None), "psi"),
+        ("coolant_temp_c", "冷却液温度", getattr(latest, "coolant_temp_c", None), "°C"),
+        ("oil_life_percent", "机油寿命", getattr(latest, "oil_life_percent", None), "%"),
+        ("lighting", "灯光", "正常", ""),
+        ("chain_belt", "链条 / 皮带", "待检查", ""),
+    ]
+    items = []
+    for key, label, value, unit in metrics:
+        status = "unknown"
+        advice = "建议到店确认"
+        if value is not None and value != "":
+            status = "normal"
+            advice = "当前项目正常"
+            if key == "battery_voltage" and float(value) < 12:
+                status = "warning"
+                advice = "电压偏低，建议尽快检查"
+            if key.startswith("tire_") and float(value) < 26:
+                status = "notice"
+                advice = "胎压偏低，建议补压"
+            if key == "coolant_temp_c" and float(value) > 105:
+                status = "warning"
+                advice = "温度偏高，建议尽快处理"
+            if key == "oil_life_percent" and float(value) < 20:
+                status = "notice"
+                advice = "机油寿命偏低，建议安排保养"
+        items.append(
+            {
+                "key": key,
+                "label": label,
+                "value": f"{value}{unit}" if value not in (None, "") and unit else (value if value not in (None, "") else "-"),
+                "status": status,
+                "advice": advice,
+            }
+        )
+    return items
+
+
+def _determine_health_state(items: list[dict[str, Any]]) -> str:
+    statuses = [item.get("status") for item in items]
+    if "warning" in statuses:
+        return "warning"
+    if "notice" in statuses:
+        return "notice"
+    if "normal" in statuses:
+        return "normal"
+    return "unknown"
+
+
+def _build_health_summary(target: dict[str, Any], db: Session, ctx: dict[str, Any]) -> tuple[dict[str, Any], VehicleHealthRecord | None]:
+    latest = (
+        db.query(VehicleHealthRecord)
+        .filter(
+            VehicleHealthRecord.store_id == ctx["store_id"],
+            VehicleHealthRecord.customer_id == str(ctx["partner_id"]),
+            VehicleHealthRecord.vehicle_plate == target["license_plate"],
+        )
+        .order_by(VehicleHealthRecord.measured_at.desc(), VehicleHealthRecord.id.desc())
+        .first()
+    )
+    inspection_items = _build_inspection_items(latest)
+    pending_recommendations = 0
+    if target.get("catalog_model_id"):
+        pending_recommendations = (
+            db.query(VehicleServiceTemplateItem)
+            .filter(
+                VehicleServiceTemplateItem.model_id == target["catalog_model_id"],
+                VehicleServiceTemplateItem.is_active.is_(True),
+            )
+            .count()
+        )
+    flags = [item for item in inspection_items if item["status"] in {"warning", "notice"}][:3]
+    return (
+        {
+            "latest_odometer_km": float(latest.odometer_km) if latest else None,
+            "health_records_count": 1 if latest else 0,
+            "pending_recommendations": int(pending_recommendations),
+            "latest_order_status": "done",
+            "latest_measured_at": latest.measured_at if latest else None,
+            "flags": flags,
+            "inspection_items": inspection_items,
+        },
+        latest,
+    )
+
+
+def _build_recommended_services(model_id: int | None, db: Session) -> list[dict[str, Any]]:
+    if not model_id:
+        return []
+    template_rows = (
+        db.query(VehicleServiceTemplateItem)
+        .filter(
+            VehicleServiceTemplateItem.model_id == model_id,
+            VehicleServiceTemplateItem.is_active.is_(True),
+        )
+        .order_by(VehicleServiceTemplateItem.sort_order.asc(), VehicleServiceTemplateItem.id.asc())
+        .limit(20)
+        .all()
+    )
+    ids = [row.id for row in template_rows]
+    profile_map = {
+        row.template_item_id: row
+        for row in db.query(VehicleServiceTemplateProfile).filter(VehicleServiceTemplateProfile.template_item_id.in_(ids or [-1])).all()
+    }
+    return [
+        {
+            "id": row.id,
+            "service_name": row.part_name,
+            "service_code": row.part_code,
+            "repair_method": row.repair_method,
+            "suggested_price": profile_map.get(row.id).suggested_price if profile_map.get(row.id) else None,
+        }
+        for row in template_rows
+    ]
+
+
+def _build_shop_items(model_id: int | None, db: Session) -> list[dict[str, Any]]:
+    if not model_id:
+        return []
+    items: list[dict[str, Any]] = []
+    package_rows = (
+        db.query(VehicleServicePackage)
+        .filter(VehicleServicePackage.model_id == model_id, VehicleServicePackage.is_active.is_(True))
+        .order_by(VehicleServicePackage.sort_order.asc(), VehicleServicePackage.id.asc())
+        .limit(10)
+        .all()
+    )
+    for row in package_rows:
+        items.append(
+            {
+                "product_type": "package",
+                "id": row.id,
+                "name": row.package_name,
+                "category": "套餐",
+                "description": row.description,
+                "price": row.suggested_price_total,
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {
+                    "recommended_interval_km": row.recommended_interval_km,
+                    "recommended_interval_months": row.recommended_interval_months,
+                },
+            }
+        )
+    service_rows = _build_recommended_services(model_id, db)
+    for row in service_rows:
+        items.append(
+            {
+                "product_type": "service",
+                "id": row["id"],
+                "name": row["service_name"],
+                "category": "服务",
+                "description": row["repair_method"],
+                "price": row["suggested_price"],
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {},
+            }
+        )
+    part_rows = (
+        db.query(PartCatalogItem, PartCatalogProfile)
+        .outerjoin(PartCatalogProfile, PartCatalogProfile.part_id == PartCatalogItem.id)
+        .filter(PartCatalogItem.is_active.is_(True))
+        .limit(20)
+        .all()
+    )
+    for part, profile in part_rows:
+        compatible = part.compatible_model_ids or []
+        if compatible and model_id not in compatible:
+            continue
+        items.append(
+            {
+                "product_type": "part",
+                "id": part.id,
+                "name": part.name,
+                "category": part.category,
+                "description": part.brand,
+                "price": profile.sale_price if profile else None,
+                "stock_qty": profile.stock_qty if profile else None,
+                "is_recommended": True,
+                "compatible_model_ids": compatible or [model_id],
+                "payload": {
+                    "unit": part.unit,
+                    "brand": part.brand,
+                },
+            }
+        )
+    return items
+
+
+@router.get("/cockpit", summary="客户驾驶舱")
+async def customer_cockpit(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    vehicles = _load_customer_vehicles(ctx["partner_id"], db)
+    if not target:
+        return {
+            "selected_vehicle_id": None,
+            "vehicle": None,
+            "vehicles": vehicles,
+            "health_state": "unknown",
+            "health_summary": {"inspection_items": []},
+            "recommended_services": [],
+            "knowledge_docs": [],
+            "shop_items": [],
+        }
+    health_summary, _latest = _build_health_summary(target, db, ctx)
+    knowledge_docs = await customer_vehicle_knowledge_docs(target["id"], "", db, ctx)
+    recommended_services = _build_recommended_services(target.get("catalog_model_id"), db)
+    shop_items = _build_shop_items(target.get("catalog_model_id"), db)[:6]
+    return {
+        "selected_vehicle_id": target["id"],
+        "vehicle": target,
+        "vehicles": vehicles,
+        "health_state": _determine_health_state(health_summary["inspection_items"]),
+        "health_summary": health_summary,
+        "recommended_services": recommended_services,
+        "knowledge_docs": knowledge_docs,
+        "shop_items": shop_items,
+    }
+
+
+@router.get("/ai/context", response_model=CustomerAiContextResponse, summary="AI 上下文")
+async def customer_ai_context(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    cockpit = await customer_cockpit(vehicle_id, db, ctx)
+    return {
+        "vehicle_id": cockpit["selected_vehicle_id"],
+        "selected_vehicle_id": cockpit["selected_vehicle_id"],
+        "vehicle": cockpit["vehicle"],
+        "vehicles": cockpit["vehicles"],
+        "health_state": cockpit["health_state"],
+        "health_summary": cockpit["health_summary"],
+        "inspection_items": cockpit["health_summary"].get("inspection_items", []),
+        "recommended_services": cockpit["recommended_services"],
+        "knowledge_docs": cockpit["knowledge_docs"],
+        "shop_items": cockpit["shop_items"],
+    }
+
+
+@router.get("/ai/suggestions", summary="AI 推荐问题")
+async def customer_ai_suggestions(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    plate = target["license_plate"] if target else "当前车辆"
+    return {
+        "suggestions": [
+            f"{plate} 现在最该优先处理什么？",
+            "这次应该先做保养还是先排查故障？",
+            "如果只做一项，最值得先做什么？",
+            "有没有更适合当前车况的套餐或配件？",
+        ]
+    }
+
+
+@router.post("/ai/chat", response_model=CustomerAiChatResponse, summary="AI 对话")
+async def customer_ai_chat(
+    payload: CustomerAiChatRequest,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(payload.vehicle_id, db, ctx)
+    cockpit = await customer_cockpit(target["id"] if target else None, db, ctx)
+    proxy_payload = {
+        "message": payload.message,
+        "vehicle": cockpit["vehicle"],
+        "health_summary": cockpit["health_summary"],
+        "recommended_services": cockpit["recommended_services"],
+        "context": payload.context,
+    }
+    try:
+        resp = requests.post(f"{settings.AI_URL.rstrip('/')}/chat", json=proxy_payload, timeout=settings.AI_PROXY_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        ai_payload = resp.json()
+    except Exception:
+        ai_payload = {
+            "response": "建议先查看当前检测摘要，再决定是否预约保养或进店排查。",
+            "suggested_actions": ["查看车辆详情", "创建预约草稿"],
+            "action_cards": [{"label": "创建预约草稿", "action": "create_appointment"}],
+            "sources": [{"title": "车辆驾驶舱"}],
+            "debug": {"provider": "local-fallback"},
+        }
+    ai_payload["vehicle_id"] = cockpit["selected_vehicle_id"]
+    ai_payload["health_state"] = cockpit["health_state"]
+    return ai_payload
+
+
+@router.get("/shop/products", response_model=CustomerShopProductListResponse, summary="商城商品列表")
+async def customer_shop_products(
+    vehicle_id: int | None = Query(None),
+    kind: str = Query(""),
+    query: str = Query(""),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    items = _build_shop_items(target.get("catalog_model_id") if target else None, db)
+    normalized_kind = normalize_text(kind)
+    normalized_query = normalize_text(query)
+    if normalized_kind:
+        items = [item for item in items if item["product_type"] == normalized_kind]
+    if normalized_query:
+        items = [item for item in items if normalized_query in normalize_text(item["name"]).lower() or normalized_query in normalize_text(item.get("description")).lower()]
+    return {"items": items}
+
+
+@router.get("/shop/recommendations", response_model=CustomerShopProductListResponse, summary="商城推荐")
+async def customer_shop_recommendations(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    return {"items": _build_shop_items(target.get("catalog_model_id") if target else None, db)[:6]}
+
+
+@router.get("/shop/products/{product_id}", response_model=CustomerShopProductDetailResponse, summary="商品详情")
+async def customer_shop_product_detail(
+    product_id: int,
+    product_type: str = Query("part"),
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    items = _build_shop_items(target.get("catalog_model_id") if target else None, db)
+    item = next((row for row in items if row["id"] == product_id and row["product_type"] == normalize_text(product_type)), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="product not found")
+    return {"item": item}
+
+
+@router.post("/appointments/draft", response_model=CustomerAppointmentDraftResponse, summary="创建预约草稿")
+async def customer_create_appointment_draft(
+    payload: CustomerAppointmentDraftCreate,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(payload.vehicle_id, db, ctx) if payload.vehicle_id else _resolve_vehicle_for_customer(None, db, ctx)
+    draft = CustomerAppointmentDraft(
+        store_id=ctx["store_id"],
+        partner_id=ctx["partner_id"],
+        vehicle_id=target["id"] if target else payload.vehicle_id,
+        vehicle_plate=target["license_plate"] if target else None,
+        subject=compact_whitespace(payload.subject) or "预约草稿",
+        service_kind=normalize_text(payload.service_kind),
+        source=normalize_text(payload.source) or "mini_program",
+        preferred_date=payload.preferred_date,
+        notes=compact_whitespace(payload.notes),
+        payload=payload.payload or {},
+        status="draft",
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return draft
+
+
+@router.get("/appointments/draft/{draft_id}", response_model=CustomerAppointmentDraftResponse, summary="预约草稿详情")
+async def customer_get_appointment_draft(
+    draft_id: int,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    draft = (
+        db.query(CustomerAppointmentDraft)
+        .filter(
+            CustomerAppointmentDraft.id == draft_id,
+            CustomerAppointmentDraft.partner_id == ctx["partner_id"],
+            CustomerAppointmentDraft.store_id == ctx["store_id"],
+        )
+        .first()
+    )
+    if not draft:
+        raise HTTPException(status_code=404, detail="draft not found")
+    return draft

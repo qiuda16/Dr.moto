@@ -1,0 +1,239 @@
+﻿{
+    "summary":  {
+                    "pass":  12,
+                    "fail":  0,
+                    "total":  12
+                },
+    "time":  "2026-04-23T16:06:16.2383858+08:00",
+    "results":  [
+                    {
+                        "phase":  "baseline",
+                        "ok":  true,
+                        "query":  "which license plates are ready for delivery now",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "store_ops_fast_path":  true,
+                                      "query_domains":  [
+                                                            "vehicle",
+                                                            "store_ops"
+                                                        ],
+                                      "primary_domain":  "vehicle"
+                                  }
+                    },
+                    {
+                        "phase":  "baseline",
+                        "ok":  true,
+                        "query":  "what bmw models are in the system",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "global_query_fast_path":  true,
+                                      "query_domains":  [
+                                                            "catalog"
+                                                        ],
+                                      "primary_domain":  "catalog",
+                                      "catalog_no_data_reframed":  true
+                                  }
+                    },
+                    {
+                        "phase":  "baseline",
+                        "ok":  true,
+                        "query":  "motorcycle rear brake noise first check steps",
+                        "debug":  {
+                                      "proxy_fallback":  true,
+                                      "reason":  "ai_timeout"
+                                  }
+                    },
+                    {
+                        "phase":  "baseline",
+                        "ok":  true,
+                        "query":  "help me check",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "user_message_chars":  13,
+                                      "context_snapshot_chars":  16,
+                                      "context_json_chars":  810,
+                                      "kb_chars":  13,
+                                      "project_brain_chars":  0,
+                                      "data_source_brain_chars":  0,
+                                      "project_data_tree_chars":  0,
+                                      "project_ontology_chars":  0,
+                                      "project_guidance_chars":  0,
+                                      "query_domains":  [
+                                                            "general"
+                                                        ],
+                                      "primary_domain":  "general",
+                                      "source_hints":  [
+
+                                                       ],
+                                      "retrieval_plan_count":  0,
+                                      "memory_summary_chars":  3010,
+                                      "memory_recall_count":  4,
+                                      "known_facts_count":  0,
+                                      "chat_history_count":  0,
+                                      "context_json_budget":  2500,
+                                      "estimated_input_tokens":  2487,
+                                      "estimated_remaining_tokens":  38473,
+                                      "escalation_tone_softened":  true
+                                  }
+                    },
+                    {
+                        "phase":  "ollama_down",
+                        "ok":  true,
+                        "query":  "which license plates are ready for delivery now",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "store_ops_fast_path":  true,
+                                      "query_domains":  [
+                                                            "vehicle",
+                                                            "store_ops"
+                                                        ],
+                                      "primary_domain":  "vehicle"
+                                  }
+                    },
+                    {
+                        "phase":  "ollama_down",
+                        "ok":  true,
+                        "query":  "what bmw models are in the system",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "global_query_fast_path":  true,
+                                      "query_domains":  [
+                                                            "catalog"
+                                                        ],
+                                      "primary_domain":  "catalog",
+                                      "catalog_no_data_reframed":  true
+                                  }
+                    },
+                    {
+                        "phase":  "ollama_down",
+                        "ok":  true,
+                        "query":  "motorcycle rear brake noise first check steps",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "llm_error":  "Ollama chat failed for all configured models: HTTPConnectionPool(host=\u0027127.0.0.1\u0027, port=59999): Max retries exceeded with url: /api/chat (Caused by NewConnectionError(\u0027\u003curllib3.connection.HTTPConnection object at 0x7622d62486e0\u003e: Failed to establish a new connection: [Errno 111] Connection refused\u0027))",
+                                      "recovery_fallback_triggered":  true,
+                                      "query_domains":  [
+                                                            "general"
+                                                        ]
+                                  }
+                    },
+                    {
+                        "phase":  "ollama_down",
+                        "ok":  true,
+                        "query":  "help me check",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "llm_error":  "Ollama chat failed for all configured models: HTTPConnectionPool(host=\u0027127.0.0.1\u0027, port=59999): Max retries exceeded with url: /api/chat (Caused by NewConnectionError(\u0027\u003curllib3.connection.HTTPConnection object at 0x7622d621fd10\u003e: Failed to establish a new connection: [Errno 111] Connection refused\u0027))",
+                                      "recovery_fallback_triggered":  true,
+                                      "query_domains":  [
+                                                            "general"
+                                                        ]
+                                  }
+                    },
+                    {
+                        "phase":  "forced_recovery_mode",
+                        "ok":  true,
+                        "query":  "ready_plates",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "store_ops_fast_path":  true,
+                                      "query_domains":  [
+                                                            "vehicle",
+                                                            "store_ops"
+                                                        ],
+                                      "primary_domain":  "vehicle"
+                                  }
+                    },
+                    {
+                        "phase":  "after_restore",
+                        "ok":  true,
+                        "query":  "bmw_models",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "fast_path_used":  true,
+                                      "global_query_fast_path":  true,
+                                      "query_domains":  [
+                                                            "catalog"
+                                                        ],
+                                      "primary_domain":  "catalog",
+                                      "catalog_no_data_reframed":  true
+                                  }
+                    },
+                    {
+                        "phase":  "redis_down",
+                        "ok":  true,
+                        "query":  "memory_query",
+                        "debug":  {
+                                      "provider":  "ollama",
+                                      "model":  "qwen3:8b",
+                                      "fallback_model":  "qwen3:4b",
+                                      "context_window_tokens":  40960,
+                                      "user_message_chars":  49,
+                                      "context_snapshot_chars":  16,
+                                      "context_json_chars":  879,
+                                      "kb_chars":  13,
+                                      "project_brain_chars":  0,
+                                      "data_source_brain_chars":  0,
+                                      "project_data_tree_chars":  0,
+                                      "project_ontology_chars":  0,
+                                      "project_guidance_chars":  0,
+                                      "query_domains":  [
+                                                            "vehicle"
+                                                        ],
+                                      "primary_domain":  "vehicle",
+                                      "source_hints":  [
+                                                           "bff.vehicle",
+                                                           "odoo.partner_vehicle"
+                                                       ],
+                                      "retrieval_plan_count":  1,
+                                      "memory_summary_chars":  0,
+                                      "memory_recall_count":  3,
+                                      "known_facts_count":  0,
+                                      "chat_history_count":  0,
+                                      "context_json_budget":  6000,
+                                      "estimated_input_tokens":  1325,
+                                      "estimated_remaining_tokens":  39635
+                                  }
+                    },
+                    {
+                        "phase":  "bff_down_guard",
+                        "ok":  true,
+                        "query":  "guard_recover",
+                        "debug":  {
+                                      "exit_code":  0
+                                  }
+                    }
+                ]
+}

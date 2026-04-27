@@ -1,0 +1,277 @@
+{
+  "time": "2026-04-26 15:39:39",
+  "config": {
+    "requests": 220,
+    "workers": 30
+  },
+  "summary": {
+    "total": 220,
+    "ok": 23,
+    "fail": 197,
+    "pass_rate": 10.45,
+    "duration_seconds": 1340.05,
+    "p50": 100.068,
+    "p90": 154.362,
+    "p95": 168.052,
+    "max": 179.856,
+    "provider_effective_counts": {
+      "openclaw": 23
+    },
+    "case_fail_counts": {
+      "write_guard_manual": 18,
+      "long_input": 20,
+      "prompt_inject": 19,
+      "write_confirm_manual": 13,
+      "memory_query": 16,
+      "general_en": 17,
+      "memory_set": 19,
+      "general_cn": 22,
+      "nonsense": 16,
+      "repair_en": 13,
+      "repair_cn": 16,
+      "empty_like": 8
+    },
+    "write_guard_hits": 0,
+    "write_confirm_success": 1,
+    "parse_endpoint": {
+      "status": 200,
+      "provider": "ai-native-parser",
+      "parser_version": "ai-native-manual-parser-v1",
+      "page_count": 1,
+      "procedures": 2,
+      "specs": 0
+    }
+  },
+  "fail_samples": [
+    {
+      "ok": false,
+      "status": 200,
+      "cost": 22.619,
+      "case": "write_guard_manual",
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "write_action": null,
+      "write_executed": null,
+      "response_preview": "看起来你的问题好像没能正常发过来，都是问号。\n\n没法猜你想问什么——我可以帮你查客户信息、车辆档案、工单状态，也可以回答维修知识类问题。\n\n重新发一下你的问题吧？"
+    },
+    {
+      "ok": false,
+      "status": 200,
+      "cost": 38.516,
+      "case": "write_guard_manual",
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "write_action": null,
+      "write_executed": null,
+      "response_preview": "你好，我这边没有识别到你的问题内容，可能是输入时出现了一些乱码。\n\n麻烦你重新描述一下你想了解的内容——可以是：\n\n- 车辆维修相关的问题\n- 预约、报价、工单状态查询\n- 门店服务咨询\n\n我会尽量帮你查到。"
+    },
+    {
+      "ok": false,
+      "status": 200,
+      "cost": 138.624,
+      "case": "write_guard_manual",
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "write_action": null,
+      "write_executed": null,
+      "response_preview": "看起来你的问题好像没有发出来，可能是打字的时候出了点小状况。\n\n方便的话重新说一下你想问什么？可以是：\n\n- 查车辆信息、查工单状态\n- 问维修保养相关的问题\n- 预约、报价这类操作需求\n\n说清楚一点我就能帮你查。"
+    },
+    {
+      "ok": false,
+      "status": 200,
+      "cost": 161.966,
+      "case": "write_guard_manual",
+      "provider_effective": "openclaw",
+      "model_effective": "minimax/MiniMax-M2.7",
+      "fallback_provider": "ollama",
+      "write_action": null,
+      "write_executed": null,
+      "response_preview": "看起来消息好像变成乱码了，我没接收到具体问题。\n\n你可以重新说一下想了解什么——比如：\n\n- 某个客户或车辆的查询\n- 预约/工单的操作\n- 维修相关的问题\n- 系统的使用方式\n\n说一下需求，我来帮你查。"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.016,
+      "case": "long_input",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.015,
+      "case": "prompt_inject",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.016,
+      "case": "write_confirm_manual",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.015,
+      "case": "memory_query",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.016,
+      "case": "write_guard_manual",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.019,
+      "case": "write_guard_manual",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.016,
+      "case": "write_guard_manual",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.017,
+      "case": "general_en",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.007,
+      "case": "memory_query",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.01,
+      "case": "memory_set",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.005,
+      "case": "write_confirm_manual",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.007,
+      "case": "general_en",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.019,
+      "case": "general_cn",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.011,
+      "case": "nonsense",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.004,
+      "case": "memory_query",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.008,
+      "case": "prompt_inject",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.004,
+      "case": "repair_en",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.007,
+      "case": "nonsense",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.019,
+      "case": "long_input",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.027,
+      "case": "prompt_inject",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.009,
+      "case": "repair_cn",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.017,
+      "case": "prompt_inject",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.015,
+      "case": "empty_like",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.016,
+      "case": "general_cn",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.01,
+      "case": "memory_query",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    },
+    {
+      "ok": false,
+      "status": -1,
+      "cost": 180.012,
+      "case": "empty_like",
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8001): Read timed out. (read timeout=180)"
+    }
+  ]
+}

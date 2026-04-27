@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -43,6 +45,32 @@ KNOWLEDGE_NOTES_MAX = 2000
 
 def _catalog_vehicle_key(model_id: int) -> str:
     return f"CATALOG_MODEL:{model_id}"
+
+
+def _ensure_catalog_vehicle_stub(db: Session, model: VehicleCatalogModel) -> Vehicle:
+    vehicle_key = _catalog_vehicle_key(model.id)
+    row = db.query(Vehicle).filter(Vehicle.key == vehicle_key).first()
+    if row:
+        return row
+
+    engine_code = model.default_engine_code
+    if not engine_code and model.displacement_cc:
+        try:
+            engine_code = f"{int(model.displacement_cc)}cc"
+        except Exception:
+            engine_code = str(model.displacement_cc)
+
+    row = Vehicle(
+        key=vehicle_key,
+        make=model.brand or "UNKNOWN",
+        model=model.model_name or f"Catalog Model {model.id}",
+        year_from=int(model.year_from or datetime.now(timezone.utc).year),
+        year_to=model.year_to,
+        engine_code=engine_code,
+    )
+    db.add(row)
+    db.flush()
+    return row
 
 
 def _validate_bounded_text(value: Optional[str], field_name: str, max_length: int, default: Optional[str] = None) -> Optional[str]:
@@ -1483,6 +1511,10 @@ async def create_catalog_model_manual(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "manager"]))
 ):
+    model = db.query(VehicleCatalogModel).filter(VehicleCatalogModel.id == model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="标准车型不存在")
+    _ensure_catalog_vehicle_stub(db, model)
     row = Procedure(
         vehicle_key=_catalog_vehicle_key(model_id),
         name=payload.name,
@@ -2287,6 +2319,8 @@ async def bind_parse_job_to_catalog_model(
         _ensure_baseline_service_items_for_model(db, target_model.id)
         created = True
 
+    _ensure_catalog_vehicle_stub(db, target_model)
+
     document.catalog_candidate_json = candidate or None
     _set_document_catalog_confirmation(document, target_model, current_user)
     _rebind_document_related_records(db, document, target_model.id)
@@ -2454,6 +2488,10 @@ async def materialize_parse_job_segments(
         .order_by(VehicleKnowledgeParsePage.page_number.asc(), VehicleKnowledgeParsePage.id.asc())
         .all()
     )
+    model = db.query(VehicleCatalogModel).filter(VehicleCatalogModel.id == source_document.model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="标准车型不存在")
+    _ensure_catalog_vehicle_stub(db, model)
     vehicle_key = _catalog_vehicle_key(source_document.model_id)
     materialized = []
     for segment in toc_segments:

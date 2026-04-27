@@ -1,0 +1,427 @@
+{
+  "generated_at": "2026-04-23T21:49:55",
+  "config": {
+    "base_url": "http://127.0.0.1:18080",
+    "store_id": "default",
+    "model_id": 150,
+    "model_info": {
+      "brand": "ADIVA",
+      "model_name": "AD1 200",
+      "year_from": 2024,
+      "year_to": 2024,
+      "displacement_cc": 200,
+      "category": "倒三轮系列",
+      "fuel_type": "gasoline",
+      "default_engine_code": null,
+      "source": "58moto_api_20260329",
+      "is_active": true,
+      "id": 150
+    },
+    "quick_pdf": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+    "quick_rounds": 8,
+    "quick_workers": 4,
+    "real_pdf": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\1_real_sample_12p.pdf",
+    "real_rounds": 2,
+    "real_workers": 1,
+    "cleanup_source_document": true
+  },
+  "batches": [
+    {
+      "label": "quick",
+      "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+      "rounds": 8,
+      "workers": 4,
+      "results": [
+        {
+          "case_id": "quick-002",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.363,
+            "parse_total_seconds": 8.122,
+            "bind_model_seconds": 0.026,
+            "import_specs_seconds": 0.01,
+            "materialize_segments_seconds": 0.01,
+            "sync_manual_parts_seconds": 0.024,
+            "total_seconds": 8.554
+          },
+          "ids": {
+            "document_id": 323,
+            "job_id": 40,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-001",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.363,
+            "parse_total_seconds": 14.157,
+            "bind_model_seconds": 0.027,
+            "import_specs_seconds": 0.008,
+            "materialize_segments_seconds": 0.007,
+            "sync_manual_parts_seconds": 0.022,
+            "total_seconds": 14.586
+          },
+          "ids": {
+            "document_id": 322,
+            "job_id": 39,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-004",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.364,
+            "parse_total_seconds": 22.195,
+            "bind_model_seconds": 0.024,
+            "import_specs_seconds": 0.008,
+            "materialize_segments_seconds": 0.006,
+            "sync_manual_parts_seconds": 0.019,
+            "total_seconds": 22.615
+          },
+          "ids": {
+            "document_id": 325,
+            "job_id": 42,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-003",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.364,
+            "parse_total_seconds": 28.217,
+            "bind_model_seconds": 0.021,
+            "import_specs_seconds": 0.006,
+            "materialize_segments_seconds": 0.005,
+            "sync_manual_parts_seconds": 0.018,
+            "total_seconds": 28.631
+          },
+          "ids": {
+            "document_id": 324,
+            "job_id": 41,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-005",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.023,
+            "parse_total_seconds": 28.165,
+            "bind_model_seconds": 0.027,
+            "import_specs_seconds": 0.009,
+            "materialize_segments_seconds": 0.007,
+            "sync_manual_parts_seconds": 0.028,
+            "total_seconds": 28.259
+          },
+          "ids": {
+            "document_id": 326,
+            "job_id": 43,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-006",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.02,
+            "parse_total_seconds": 28.166,
+            "bind_model_seconds": 0.03,
+            "import_specs_seconds": 0.008,
+            "materialize_segments_seconds": 0.01,
+            "sync_manual_parts_seconds": 0.025,
+            "total_seconds": 28.258
+          },
+          "ids": {
+            "document_id": 327,
+            "job_id": 44,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-007",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.019,
+            "parse_total_seconds": 28.176,
+            "bind_model_seconds": 0.033,
+            "import_specs_seconds": 0.007,
+            "materialize_segments_seconds": 0.013,
+            "sync_manual_parts_seconds": 0.021,
+            "total_seconds": 28.269
+          },
+          "ids": {
+            "document_id": 328,
+            "job_id": 45,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "quick-008",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\Ducati_Monster_Manual_Mock.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.021,
+            "parse_total_seconds": 28.118,
+            "bind_model_seconds": 0.019,
+            "import_specs_seconds": 0.006,
+            "materialize_segments_seconds": 0.007,
+            "sync_manual_parts_seconds": 0.018,
+            "total_seconds": 28.189
+          },
+          "ids": {
+            "document_id": 329,
+            "job_id": 46,
+            "bound_model_id": 150
+          },
+          "counts": {
+            "parsed_pages": 3,
+            "summary_specs": 1,
+            "summary_procedures": 5,
+            "summary_sections": 2,
+            "bound_model_created": false,
+            "bind_mode": "fallback_bind_existing",
+            "imported_specs": 1,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        }
+      ],
+      "summary": {
+        "total": 8,
+        "ok": 8,
+        "fail": 0,
+        "pass_rate": 100.0,
+        "wall_clock_seconds": 56.842,
+        "p50_seconds": 28.258,
+        "p90_seconds": 28.269,
+        "p95_seconds": 28.631,
+        "avg_seconds": 23.42,
+        "error_counter": {}
+      }
+    },
+    {
+      "label": "real",
+      "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\1_real_sample_12p.pdf",
+      "rounds": 2,
+      "workers": 1,
+      "results": [
+        {
+          "case_id": "real-001",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\1_real_sample_12p.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.11,
+            "parse_total_seconds": 72.27,
+            "bind_model_seconds": 0.149,
+            "import_specs_seconds": 0.02,
+            "materialize_segments_seconds": 0.015,
+            "sync_manual_parts_seconds": 0.04,
+            "total_seconds": 72.605
+          },
+          "ids": {
+            "document_id": 330,
+            "job_id": 47,
+            "bound_model_id": 2231
+          },
+          "counts": {
+            "parsed_pages": 12,
+            "summary_specs": 9,
+            "summary_procedures": 12,
+            "summary_sections": 31,
+            "bound_model_created": false,
+            "bind_mode": "auto_bind",
+            "imported_specs": 9,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        },
+        {
+          "case_id": "real-002",
+          "pdf_path": "C:\\Users\\WIN10\\Desktop\\qd part\\drmoto\\1_real_sample_12p.pdf",
+          "ok": true,
+          "error": "",
+          "durations": {
+            "upload_seconds": 0.04,
+            "parse_total_seconds": 162.657,
+            "bind_model_seconds": 0.087,
+            "import_specs_seconds": 0.015,
+            "materialize_segments_seconds": 0.013,
+            "sync_manual_parts_seconds": 0.035,
+            "total_seconds": 162.847
+          },
+          "ids": {
+            "document_id": 331,
+            "job_id": 48,
+            "bound_model_id": 2231
+          },
+          "counts": {
+            "parsed_pages": 12,
+            "summary_specs": 9,
+            "summary_procedures": 12,
+            "summary_sections": 31,
+            "bound_model_created": false,
+            "bind_mode": "auto_bind",
+            "imported_specs": 9,
+            "materialized_segments": 0,
+            "materialize_mode": "soft_skip_no_toc",
+            "service_items_synced": 9
+          },
+          "status_trace": [
+            "completed"
+          ]
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "ok": 2,
+        "fail": 0,
+        "pass_rate": 100.0,
+        "wall_clock_seconds": 235.474,
+        "p50_seconds": 72.605,
+        "p90_seconds": 162.847,
+        "p95_seconds": 162.847,
+        "avg_seconds": 117.726,
+        "error_counter": {}
+      }
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "ok": 10,
+    "fail": 0,
+    "overall_pass": true,
+    "overall_pass_rate": 100.0
+  }
+}

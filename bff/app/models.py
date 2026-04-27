@@ -54,8 +54,25 @@ class AppSetting(Base):
     primary_color = Column(String(32), nullable=False, default="#409EFF")
     default_labor_price = Column(Float, nullable=True, default=80)
     default_delivery_note = Column(String(255), nullable=True)
+    document_header_note = Column(String(255), nullable=True)
+    customer_document_footer_note = Column(String(255), nullable=True)
+    internal_document_footer_note = Column(String(255), nullable=True)
+    default_service_advice = Column(String(255), nullable=True)
     common_complaint_phrases_json = Column(JSON, nullable=True)
     updated_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class StaffAccount(Base):
+    __tablename__ = "staff_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(255), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    role = Column(String(64), nullable=False, default="staff", index=True)
+    disabled = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -485,6 +502,25 @@ class CustomerSubscriptionPref(Base):
     remind_before_km = Column(Integer, nullable=False, default=500)
     prefer_channel = Column(String(255), nullable=False, default="wechat_subscribe")
     last_notified_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class CustomerAppointmentDraft(Base):
+    __tablename__ = "customer_appointment_drafts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(String(255), index=True, nullable=False, default="default")
+    partner_id = Column(Integer, index=True, nullable=False)
+    vehicle_id = Column(Integer, index=True, nullable=True)
+    vehicle_plate = Column(String(255), nullable=True)
+    subject = Column(String(255), nullable=False)
+    service_kind = Column(String(255), nullable=True)
+    source = Column(String(255), nullable=True, default="mini_program")
+    preferred_date = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(String(255), nullable=True)
+    payload = Column(JSON, nullable=True)
+    status = Column(String(255), nullable=False, default="draft")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

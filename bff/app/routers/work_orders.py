@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
 from difflib import SequenceMatcher
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -103,6 +105,13 @@ def _is_odoo_record_missing_error(exc: Exception) -> bool:
     return "record does not exist or has been deleted" in message
 
 
+def _is_odoo_model_missing_error(exc: Exception, model_name: str | None = None) -> bool:
+    message = str(exc or "").lower()
+    if "object" not in message or "doesn't exist" not in message:
+        return False
+    return not model_name or model_name.lower() in message
+
+
 def _default_quick_check() -> dict:
     return {
         "odometer_km": None,
@@ -124,6 +133,46 @@ def _resolve_delivery_default_note(db: Session | None, store_id: str | None) -> 
         .first()
     )
     return compact_whitespace(row.default_delivery_note) if row and row.default_delivery_note else ""
+
+
+def _resolve_store_settings_row(db: Session | None, store_id: str | None) -> AppSetting | None:
+    normalized_store_id = compact_whitespace(store_id or "").lower() or settings.DEFAULT_STORE_ID
+    if db is None:
+        return None
+    return (
+        db.query(AppSetting)
+        .filter(AppSetting.store_id == normalized_store_id)
+        .order_by(AppSetting.id.desc())
+        .first()
+    )
+
+
+def _resolve_document_branding(db: Session | None, store_id: str | None) -> dict:
+    row = _resolve_store_settings_row(db, store_id)
+    store_name = compact_whitespace(row.store_name) if row and row.store_name else "机车博士"
+    header_note = compact_whitespace(row.document_header_note) if row and row.document_header_note else "摩托车售后服务专业单据"
+    customer_footer = (
+        compact_whitespace(row.customer_document_footer_note)
+        if row and row.customer_document_footer_note
+        else "请客户核对维修项目、金额与交车说明后签字确认。"
+    )
+    internal_footer = (
+        compact_whitespace(row.internal_document_footer_note)
+        if row and row.internal_document_footer_note
+        else "用于门店内部留档、责任追溯与施工复核。"
+    )
+    service_advice = (
+        compact_whitespace(row.default_service_advice)
+        if row and row.default_service_advice
+        else "建议客户按保养周期复检，并关注油液、制动与轮胎状态。"
+    )
+    return {
+        "store_name": store_name,
+        "header_note": header_note,
+        "customer_footer_note": customer_footer,
+        "internal_footer_note": internal_footer,
+        "service_advice": service_advice,
+    }
 
 
 def _default_delivery_checklist(db: Session | None = None, store_id: str | None = None) -> dict:
@@ -1722,7 +1771,13 @@ async def get_customer_vehicles(
         # Search drmoto.partner.vehicle where partner_id = partner_id
         domain = [['partner_id', '=', partner_id]]
         fields = ['id', 'license_plate', 'vehicle_id', 'vin', 'color']
-        vehicles = odoo_client.execute_kw('drmoto.partner.vehicle', 'search_read', [domain], {'fields': fields})
+        try:
+            vehicles = odoo_client.execute_kw('drmoto.partner.vehicle', 'search_read', [domain], {'fields': fields})
+        except Exception as exc:
+            if _is_odoo_model_missing_error(exc, "drmoto.partner.vehicle"):
+                logger.warning("Odoo vehicle model is not installed; returning empty vehicles for partner_id=%s", partner_id)
+                return []
+            raise
         vehicle_model_ids = []
         for row in vehicles:
             ref = row.get("vehicle_id")
@@ -1794,12 +1849,19 @@ async def list_customers_with_vehicles(
 
         partner_ids = [p["id"] for p in partners]
         vehicle_fields = ["id", "partner_id", "license_plate", "vin", "color", "vehicle_id"]
-        vehicles = odoo_client.execute_kw(
-            "drmoto.partner.vehicle",
-            "search_read",
-            [[["partner_id", "in", partner_ids]]],
-            {"fields": vehicle_fields, "order": "id desc"},
-        )
+        try:
+            vehicles = odoo_client.execute_kw(
+                "drmoto.partner.vehicle",
+                "search_read",
+                [[["partner_id", "in", partner_ids]]],
+                {"fields": vehicle_fields, "order": "id desc"},
+            )
+        except Exception as exc:
+            if _is_odoo_model_missing_error(exc, "drmoto.partner.vehicle"):
+                logger.warning("Odoo vehicle model is not installed; returning customers without vehicles")
+                vehicles = []
+            else:
+                raise
 
         vehicle_model_ids = []
         for row in vehicles:
@@ -3377,7 +3439,7 @@ def _render_document_html(doc_title: str, db_wo: WorkOrder, odoo_details: dict, 
   </table>
 
   <div class="foot">
-    <div class="muted">由 ???? 系统自动生成</div>
+    <div class="muted">由机车博士系统自动生成</div>
     <div>签字：___________</div>
   </div>
 </body>
@@ -3513,6 +3575,7 @@ def _render_customer_document_html(
     health_record: dict | None = None,
     selected_items: list[dict] | None = None,
     delivery_checklist: dict | None = None,
+    store_settings: dict | None = None,
 ) -> str:
     return _render_customer_document_html_clean(
         doc_type,
@@ -3523,6 +3586,7 @@ def _render_customer_document_html(
         health_record,
         selected_items,
         delivery_checklist,
+        store_settings,
     )
 
 
@@ -3535,10 +3599,12 @@ def _render_customer_document_html_clean(
     health_record: dict | None = None,
     selected_items: list[dict] | None = None,
     delivery_checklist: dict | None = None,
+    store_settings: dict | None = None,
 ) -> str:
     selected_items = selected_items or []
     health_record = health_record or {}
     delivery_checklist = delivery_checklist or {}
+    store_settings = store_settings or {}
 
     item_data = _build_doc_line_items_from_selected(selected_items) if selected_items else _build_doc_line_items(odoo_details)
     part_items = item_data["part_items"]
@@ -3554,6 +3620,10 @@ def _render_customer_document_html_clean(
     created_at = db_wo.created_at.strftime("%Y-%m-%d %H:%M") if db_wo.created_at else "-"
     description = compact_whitespace(odoo_details.get("description") or db_wo.description or "") or "-"
     vehicle_key = getattr(db_wo, "vehicle_key", None) or "-"
+    store_name = store_settings.get("store_name") or "机车博士"
+    header_note = store_settings.get("header_note") or "摩托车售后服务专业单据"
+    customer_footer_note = store_settings.get("customer_footer_note") or "请客户核对维修项目、金额与交车说明后签字确认。"
+    service_advice = store_settings.get("service_advice") or "建议客户按保养周期复检，并关注油液、制动与轮胎状态。"
     doc_label = "客户报价单" if doc_type == "quote" else "客户交付单"
     service_section_title = "报价项目明细" if doc_type == "quote" else "维修保养项目"
     notice_text = (
@@ -3561,6 +3631,8 @@ def _render_customer_document_html_clean(
         if doc_type == "quote"
         else "本交付单用于留存本次施工与交车信息，建议客户妥善保存并按建议周期回店复查。"
     )
+    if service_advice:
+        notice_text = f"{notice_text} {service_advice}".strip()
 
     if selected_items:
         service_rows = []
@@ -3676,8 +3748,8 @@ def _render_customer_document_html_clean(
   <div class="page">
     <div class="header">
       <div>
-        <div class="brand-title">机车博士</div>
-        <div class="brand-subtitle">摩托车售后服务专业单据</div>
+        <div class="brand-title">{html.escape(store_name)}</div>
+        <div class="brand-subtitle">{html.escape(header_note)}</div>
       </div>
       <div class="doc-side">
         <div class="doc-type">{html.escape(doc_title)}</div>
@@ -3756,8 +3828,8 @@ def _render_customer_document_html_clean(
     </section>
 
     <div class="footer">
-      <div>机车博士 · 客户留存联</div>
-      <div>请客户核对维修项目、金额与交车说明后签字确认</div>
+      <div>{html.escape(store_name)} · 客户留存联</div>
+      <div>{html.escape(customer_footer_note)}</div>
     </div>
   </div>
 </body>
@@ -3773,8 +3845,10 @@ def _render_document_html_v2(
     process_record: dict | None = None,
     health_record: dict | None = None,
     selected_items: list[dict] | None = None,
+    store_settings: dict | None = None,
 ) -> str:
     selected_items = selected_items or []
+    store_settings = store_settings or {}
     item_data = _build_doc_line_items_from_selected(selected_items) if selected_items else _build_doc_line_items(odoo_details)
     all_items = item_data["all_items"]
     labor_items = item_data["labor_items"]
@@ -3791,6 +3865,9 @@ def _render_document_html_v2(
     planned = odoo_details.get("date_planned") or "-"
     created_at = db_wo.created_at.strftime("%Y-%m-%d %H:%M") if db_wo.created_at else "-"
     description = compact_whitespace(odoo_details.get("description") or db_wo.description or "") or "-"
+    store_name = store_settings.get("store_name") or "机车博士"
+    header_note = store_settings.get("header_note") or "门店内部维修与领料留档单据"
+    internal_footer_note = store_settings.get("internal_footer_note") or "用于门店内部留档、责任追溯与施工复核。"
 
     process_record = process_record or {}
     symptom_draft = process_record.get("symptom_draft") or "-"
@@ -3958,8 +4035,8 @@ def _render_document_html_v2(
   <div class="page">
     <div class="header">
       <div>
-        <div class="brand-title">机车博士</div>
-        <div class="brand-subtitle">门店内部维修与领料留档单据</div>
+        <div class="brand-title">{html.escape(store_name)}</div>
+        <div class="brand-subtitle">{html.escape(header_note)}</div>
       </div>
       <div class="doc-side">
         <div class="doc-type">{html.escape(doc_title)}</div>
@@ -4005,8 +4082,8 @@ def _render_document_html_v2(
     </section>
 
     <div class="footer">
-      <div>机车博士 · 内部留存联</div>
-      <div>{html.escape('用于施工、质检与责任追溯' if doc_type == 'work-order' else '用于仓库发料与领料留档')}</div>
+      <div>{html.escape(store_name)} · 内部留存联</div>
+      <div>{html.escape(internal_footer_note)}</div>
     </div>
   </div>
 </body>
@@ -4076,6 +4153,7 @@ def _build_document_pdf(
     health_record: dict | None = None,
     selected_items: list[dict] | None = None,
     delivery_checklist: dict | None = None,
+    store_settings: dict | None = None,
 ) -> bytes:
     font_name = _ensure_pdf_font()
     styles = getSampleStyleSheet()
@@ -4089,6 +4167,7 @@ def _build_document_pdf(
     health_record = health_record or {}
     selected_items = selected_items or []
     delivery_checklist = delivery_checklist or {}
+    store_settings = store_settings or {}
     quick_check = process_record.get("quick_check") or {}
     odometer_km = quick_check.get("odometer_km")
     battery_voltage = quick_check.get("battery_voltage")
@@ -4112,6 +4191,8 @@ def _build_document_pdf(
     vehicle_key = getattr(db_wo, "vehicle_key", None) or "-"
     state = odoo_details.get("state") or db_wo.status or "-"
     planned = odoo_details.get("date_planned") or "-"
+    store_name = store_settings.get("store_name") or "机车博士"
+    header_note = store_settings.get("header_note") or "摩托车售后服务专业单据"
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=14 * mm, bottomMargin=14 * mm)
@@ -4119,7 +4200,7 @@ def _build_document_pdf(
 
     header_table = Table([
         [
-            [_pdf_paragraph("机车博士", brand_style), _pdf_paragraph("摩托车售后服务专业单据", meta_style)],
+            [_pdf_paragraph(store_name, brand_style), _pdf_paragraph(header_note, meta_style)],
             [_pdf_paragraph(doc_title, title_style), _pdf_paragraph(f"单据编号：{ref}<br/>生成时间：{created_at}", meta_style)],
         ]
     ], colWidths=[100 * mm, 76 * mm])
@@ -4392,10 +4473,9 @@ async def generate_work_order_document(
                 WorkOrderAdvancedProfile.work_order_uuid == db_wo.uuid,
             )
             .first()
-        ),
-        db,
-        store_id,
+        )
     )
+    store_settings = _resolve_document_branding(db, store_id)
     selected_items = _load_work_order_selected_items(db, store_id, order_id)
     delivery_checklist = _delivery_checklist_to_response(
         (
@@ -4417,6 +4497,7 @@ async def generate_work_order_document(
             health_data,
             selected_items,
             delivery_checklist,
+            store_settings,
         )
     else:
         html_text = _render_document_html_v2(
@@ -4427,6 +4508,7 @@ async def generate_work_order_document(
             process_data,
             health_data,
             selected_items,
+            store_settings,
         )
         html_text = _inject_document_sections(
             html_text,
@@ -4495,6 +4577,7 @@ async def download_work_order_document_pdf(
         db,
         store_id,
     )
+    store_settings = _resolve_document_branding(db, store_id)
     pdf_bytes = _build_document_pdf(
         doc_type,
         doc_titles[doc_type],
@@ -4504,6 +4587,7 @@ async def download_work_order_document_pdf(
         health_data,
         selected_items,
         delivery_checklist,
+        store_settings,
     )
     plate = compact_whitespace(db_wo.vehicle_plate or "未命名车辆") or "未命名车辆"
     file_name = f"{plate}-{doc_titles[doc_type]}-{db_wo.uuid[:8]}.pdf"

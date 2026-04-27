@@ -18,3 +18,11 @@ class User(BaseModel):
 
 class UserInDB(User):
     hashed_password: str
+
+
+class StaffAccountCreate(BaseModel):
+    username: str
+    password: str
+    email: Optional[str] = None
+    role: str = "staff"
+    disabled: bool = False

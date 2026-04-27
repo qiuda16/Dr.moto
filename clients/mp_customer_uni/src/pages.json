@@ -1,88 +1,77 @@
-﻿﻿﻿﻿{
+{
   "pages": [
     {
-      "path": "pages/dashboard/index",
+      "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "首页",
+        "navigationBarTitleText": "驾驶舱",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/health/index",
+      "path": "pages/ai/index",
       "style": {
-        "navigationBarTitleText": "体检",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "AI 助手"
       }
     },
     {
-      "path": "pages/maintenance/index",
+      "path": "pages/shop/index",
       "style": {
-        "navigationBarTitleText": "保养",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "商城"
       }
     },
     {
-      "path": "pages/profile/index",
+      "path": "pages/mine/index",
       "style": {
         "navigationBarTitleText": "我的"
       }
-    }
-  ],
-  "subPackages": [
+    },
     {
-      "root": "subpages",
-      "pages": [
-        {
-          "path": "auth/login",
-          "style": {
-            "navigationBarTitleText": "登录"
-          }
-        },
-        {
-          "path": "recommendations/index",
-          "style": {
-            "navigationBarTitleText": "推荐",
-            "enablePullDownRefresh": true
-          }
-        },
-        {
-          "path": "knowledge/index",
-          "style": {
-            "navigationBarTitleText": "科普",
-            "enablePullDownRefresh": true
-          }
-        },
-        {
-          "path": "privacy/index",
-          "style": {
-            "navigationBarTitleText": "隐私政策"
-          }
-        },
-        {
-          "path": "agreement/index",
-          "style": {
-            "navigationBarTitleText": "用户协议"
-          }
-        }
-      ]
+      "path": "pages/bind/index",
+      "style": {
+        "navigationBarTitleText": "绑定车主"
+      }
+    },
+    {
+      "path": "pages/vehicle/detail",
+      "style": {
+        "navigationBarTitleText": "车辆详情"
+      }
+    },
+    {
+      "path": "pages/appointment/index",
+      "style": {
+        "navigationBarTitleText": "预约草稿"
+      }
+    },
+    {
+      "path": "pages/history/index",
+      "style": {
+        "navigationBarTitleText": "最近任务"
+      }
+    },
+    {
+      "path": "pages/shop/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情"
+      }
     }
   ],
   "tabBar": {
-    "color": "#6b7280",
-    "selectedColor": "#de3d2b",
-    "backgroundColor": "#ffffff",
+    "color": "#748093",
+    "selectedColor": "#f7fafc",
+    "backgroundColor": "#0d141f",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/dashboard/index", "text": "首页" },
-      { "pagePath": "pages/health/index", "text": "体检" },
-      { "pagePath": "pages/maintenance/index", "text": "保养" },
-      { "pagePath": "pages/profile/index", "text": "我的" }
+      { "pagePath": "pages/index/index", "text": "驾驶舱" },
+      { "pagePath": "pages/ai/index", "text": "AI" },
+      { "pagePath": "pages/shop/index", "text": "商城" },
+      { "pagePath": "pages/mine/index", "text": "我的" }
     ]
   },
   "globalStyle": {
-    "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "车主服务",
-    "navigationBarBackgroundColor": "#f7f8fa",
-    "backgroundColor": "#f7f8fa"
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "DrMoto",
+    "navigationBarBackgroundColor": "#0d141f",
+    "backgroundColor": "#081018"
   }
 }
