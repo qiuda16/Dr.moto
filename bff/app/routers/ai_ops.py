@@ -609,14 +609,16 @@ def _search_service_items(db: Session, model_id: int | None, query: str, limit: 
 
 
 def _shop_items(db: Session, model_id: int | None, query: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
-    if not model_id:
-        return []
     normalized_query = compact_whitespace(query or "")
+    if not model_id and not normalized_query:
+        return []
     items: list[dict[str, Any]] = []
 
+    package_query = db.query(VehicleServicePackage).filter(VehicleServicePackage.is_active.is_(True))
+    if model_id:
+        package_query = package_query.filter(VehicleServicePackage.model_id == model_id)
     package_rows = (
-        db.query(VehicleServicePackage)
-        .filter(VehicleServicePackage.model_id == model_id, VehicleServicePackage.is_active.is_(True))
+        package_query
         .order_by(VehicleServicePackage.sort_order.asc(), VehicleServicePackage.id.asc())
         .all()
     )
@@ -649,8 +651,8 @@ def _shop_items(db: Session, model_id: int | None, query: str | None = None, lim
                 "description": row.description,
                 "price": row.suggested_price_total,
                 "stock_qty": None,
-                "is_recommended": True,
-                "compatible_model_ids": [model_id],
+                "is_recommended": bool(model_id),
+                "compatible_model_ids": [row.model_id],
                 "payload": {
                     "recommended_interval_km": row.recommended_interval_km,
                     "recommended_interval_months": row.recommended_interval_months,
@@ -672,8 +674,8 @@ def _shop_items(db: Session, model_id: int | None, query: str | None = None, lim
                 "description": row.get("repair_method"),
                 "price": row.get("suggested_price"),
                 "stock_qty": None,
-                "is_recommended": True,
-                "compatible_model_ids": [model_id],
+                "is_recommended": bool(model_id),
+                "compatible_model_ids": [row["model_id"]],
                 "payload": {},
             }
         )
@@ -687,7 +689,7 @@ def _shop_items(db: Session, model_id: int | None, query: str | None = None, lim
     )
     for part, profile in part_rows:
         compatible = part.compatible_model_ids or []
-        if compatible and model_id not in compatible:
+        if model_id and compatible and model_id not in compatible:
             continue
         items.append(
             {
@@ -698,8 +700,8 @@ def _shop_items(db: Session, model_id: int | None, query: str | None = None, lim
                 "description": part.brand,
                 "price": profile.sale_price if profile else None,
                 "stock_qty": profile.stock_qty if profile else None,
-                "is_recommended": True,
-                "compatible_model_ids": compatible or [model_id],
+                "is_recommended": bool(model_id),
+                "compatible_model_ids": compatible or ([model_id] if model_id else []),
                 "payload": {
                     "unit": part.unit,
                     "brand": part.brand,

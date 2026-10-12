@@ -3,6 +3,10 @@
 The system has not passed full acceptance and is not verified for production delivery.
 
 Latest full backend run: 47 passed, 1 failed (AI shop context). The staff build passes.
+The empty-shop context defect was subsequently fixed: keyword browsing works without
+a vehicle model and does not label results as compatible recommendations. The remaining
+failure now occurs in AI chat because the external AI service returns HTTP 502; the
+Odoo integration harness does not provide that AI service. AI answers remain unverified.
 The trial_core_build CI intentionally covers core contracts and staff compilation only;
 it does not run real Odoo integration or the complete backend suite. A green result
 must not be described as full system acceptance.

@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: bff/requirements.txt
       - run: pip install -r bff/requirements.txt
       - name: Test trial, customer, account and startup contracts
-        run: python -m pytest -q bff/tests/test_trial_ops.py bff/tests/test_mp_customer_api.py bff/tests/test_staff_account_safety.py bff/tests/test_startup_validation.py bff/tests/test_text_support.py
+        run: python -m pytest -q bff/tests/test_trial_ops.py bff/tests/test_mp_customer_api.py bff/tests/test_staff_account_safety.py bff/tests/test_startup_validation.py bff/tests/test_text_support.py bff/tests/test_ai_ops.py::test_shop_browse_without_vehicle_does_not_claim_compatibility
   staff-build:
     runs-on: ubuntu-latest
     timeout-minutes: 10

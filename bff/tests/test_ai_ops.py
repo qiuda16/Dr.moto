@@ -258,6 +258,27 @@ def test_ai_ops_context_returns_shop_items_and_ai_answers_them():
     assert "商品" in response_text
 
 
+def test_shop_browse_without_vehicle_does_not_claim_compatibility():
+    from app.routers.ai_ops import _shop_items
+
+    name = "Browse-" + uuid.uuid4().hex
+    with SessionLocal() as db:
+        model = VehicleCatalogModel(brand="Test", model_name=name, year_from=2024, is_active=True)
+        db.add(model)
+        db.flush()
+        model_id = model.id
+        db.add(VehicleServicePackage(model_id=model_id, package_name=name,
+            package_code=name, suggested_price_total=199, is_active=True))
+        db.commit()
+        general = _shop_items(db, None, query=name)
+        assert general
+        assert general[0]["compatible_model_ids"] == [model_id]
+        assert general[0]["is_recommended"] is False
+        matching = _shop_items(db, model_id, query=name)
+        assert matching[0]["is_recommended"] is True
+        assert _shop_items(db, model_id + 1000000, query=name) == []
+
+
 def test_ai_ops_create_and_update_part():
     headers = _admin_headers()
     part_no = f"AI-PART-{uuid.uuid4().hex[:8].upper()}"
