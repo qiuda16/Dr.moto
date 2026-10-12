@@ -1,19 +1,59 @@
 <template>
-  <view class="page">
-    <view class="card">
-      <view class="section-title">车主登录</view>
-      <view class="subtext" style="margin-bottom: 20rpx;">首次登录会自动绑定你在门店登记的手机号与车牌号。</view>
-      <input class="input" v-model="phone" maxlength="11" placeholder="请输入手机号" />
-      <input class="input" v-model="plateNo" maxlength="12" placeholder="请输入车牌号" />
-      <button class="btn-primary" @click="onLogin" :loading="loading">进入小程序</button>
-      <view v-if="errorMessage" class="subtext" style="margin-top: 16rpx; color: #bc2f1f;">{{ errorMessage }}</view>
+  <view class="page-shell">
+    <view class="page-body">
+      <view class="hero-card">
+        <view class="hero-kicker">车主入口 · 门店同步</view>
+        <view class="hero-title">欢迎回来</view>
+        <view class="hero-subtitle">手机号和车牌号绑定后，就能进入驾驶舱查看车况、工单和建议。</view>
+        <view class="summary-band">
+          <view class="summary-band__item">
+            <view class="summary-band__value">1</view>
+            <view class="summary-band__label">快速登录</view>
+          </view>
+          <view class="summary-band__item">
+            <view class="summary-band__value">2</view>
+            <view class="summary-band__label">自动绑定</view>
+          </view>
+          <view class="summary-band__item">
+            <view class="summary-band__value">3</view>
+            <view class="summary-band__label">进入驾驶舱</view>
+          </view>
+        </view>
+        <view class="hero-note">请使用门店登记的手机号与车牌号，系统会把你的账户和车辆档案同步到驾驶舱。</view>
+      </view>
+
+      <view v-if="errorMessage" class="error-state">{{ errorMessage }}</view>
+
+      <view class="light-card">
+        <view class="section-head">
+          <view class="section-title">登录信息</view>
+          <view class="section-head__sub">数据只用于车主身份校验</view>
+        </view>
+        <view class="form-panel">
+          <view class="field-label">手机号</view>
+          <input class="field-input" v-model="phone" maxlength="11" placeholder="请输入手机号" />
+          <view class="field-label">车牌号</view>
+          <input class="field-input" v-model="plateNo" maxlength="12" placeholder="请输入车牌号" />
+        </view>
+        <view class="btn-row">
+          <button class="btn-primary" @click="onLogin" :loading="loading">进入小程序</button>
+        </view>
+      </view>
+
+      <view class="light-card">
+        <view class="section-head">
+          <view class="section-title">登录说明</view>
+          <view class="section-head__sub">先绑定，再看车况</view>
+        </view>
+        <view class="muted">首次登录后，系统会自动绑定你的手机号与车牌号，后续无需重复输入。</view>
+      </view>
     </view>
   </view>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { LOGIN_DEFAULTS } from '../../config/env'
+import { ALLOW_DEMO_FALLBACK, LOGIN_DEFAULTS } from '../../config/env'
 import { api } from '../../utils/api'
 import { setSession } from '../../utils/session'
 
@@ -84,7 +124,7 @@ async function onLogin() {
 
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
-      uni.switchTab({ url: '/pages/dashboard/index' })
+      uni.reLaunch({ url: '/pages/index/index' })
     }, 200)
   } catch (err) {
     const msg = err?.message || '登录失败，请稍后重试'
@@ -112,7 +152,11 @@ function getWechatCode() {
     // #endif
 
     // #ifndef MP-WEIXIN
-    resolve(`mock-${Date.now()}`)
+    if (ALLOW_DEMO_FALLBACK) {
+      resolve(`mock-${Date.now()}`)
+      return
+    }
+    reject(new Error('请在微信小程序中登录'))
     // #endif
   })
 }

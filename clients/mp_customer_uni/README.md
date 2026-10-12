@@ -28,28 +28,41 @@ npm run build:mp-weixin
 
 复制 `.env.example` 为 `.env`，按需配置：
 
-- `VITE_TCB_ENV`：云托管环境 ID
-- `VITE_TCB_SERVICE`：云托管服务名
-- `VITE_TCB_BASE_PATH`：服务路径前缀（例如 `/api`）
-- `VITE_API_BASE`：H5 调试备用地址
+- `VITE_API_BASE`：小程序和 H5 的 HTTPS API 地址，生产环境必须显式配置，例如 `https://api.example.com/api`
+- `VITE_API_FALLBACK_BASE`：当主地址网络失败时的兜底地址，默认留空
+- `VITE_USE_CLOUD_CONTAINER`：是否改回云托管调用，默认 `false`
+- `VITE_TCB_ENV`：云托管环境 ID，只有切回云托管时才需要
+- `VITE_TCB_SERVICE`：云托管服务名，只有切回云托管时才需要
+- `VITE_TCB_BASE_PATH`：云托管服务路径前缀（例如 `/api`）
 
 说明：
-- 在微信小程序端，项目会优先走 `wx.cloud.callContainer`。
-- 在 H5 端，项目会走 `VITE_API_BASE`。
+- 生产构建必须通过环境变量显式注入 HTTPS `VITE_API_BASE`，不再使用服务器 IP 或 HTTP 地址。
+- 如果你手动配置了 `VITE_API_FALLBACK_BASE`，前端才会在主地址失败时继续尝试。
+- 如果把 `VITE_USE_CLOUD_CONTAINER` 设为 `true`，微信小程序端会改回 `wx.cloud.callContainer`。
 
 ## 5. 当前页面
 
-- 登录：`pages/auth/login`
-- 首页：`pages/dashboard/index`
-- 体检：`pages/health/index`
-- 保养：`pages/maintenance/index`
-- 推荐：`pages/recommendations/index`
-- 科普：`pages/knowledge/index`
-- 我的：`pages/profile/index`
-- 隐私政策：`pages/privacy/index`
-- 用户协议：`pages/agreement/index`
+- 驾驶舱：`pages/index/index`
+- 商城：`pages/shop/index`
+- 我的：`pages/mine/index`
+- 绑定车主：`pages/bind/index`
+- 车辆详情：`pages/vehicle/detail`
+- 预约草稿：`pages/appointment/index`
+- 最近任务：`pages/history/index`
+- 商品详情：`pages/shop/detail`
 
 ## 6. 注意事项
 
 - 小程序正式环境必须使用 HTTPS 或云托管调用。
 - 正式登录依赖后端 `WECHAT_APP_ID/WECHAT_APP_SECRET` 配置。
+# Trial Release Build
+
+WeChat production compilation requires an absolute HTTPS `VITE_API_BASE` when cloud
+container mode is disabled, and rejects `VITE_ALLOW_DEMO_FALLBACK=true`. Keep local
+`.env` and `project.private.config.json` outside Git. `project.config.json` contains
+the public AppID and imports `dist/build/mp-weixin/` into WeChat DevTools.
+
+CI uses Node 20 and `MP_CUSTOMER_API_BASE` from GitHub repository variables, defaulting
+to `https://drmoto.cloud/api`. This default is a target address, not evidence that DNS,
+TLS or WeChat request-domain setup is ready. Compilation artifacts require real login,
+binding and device acceptance before publication.

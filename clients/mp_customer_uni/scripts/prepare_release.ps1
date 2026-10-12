@@ -23,6 +23,7 @@ $manifest.'mp-weixin'.appid = $AppId
 $manifest | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $manifestPath
 
 "VITE_API_BASE=$ApiBase" | Set-Content -Encoding UTF8 $envPath
+"VITE_USE_CLOUD_CONTAINER=false" | Add-Content -Encoding UTF8 $envPath
 
 Write-Host '[完成] 已写入 AppID 与 API 域名配置'
 Write-Host "manifest: $manifestPath"

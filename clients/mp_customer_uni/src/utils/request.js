@@ -1,4 +1,4 @@
-import { API_BASE, TCB_BASE_PATH, TCB_ENV, TCB_SERVICE } from '../config/env'
+import { API_BASE, API_FALLBACK_BASE, TCB_BASE_PATH, TCB_ENV, TCB_SERVICE, USE_CLOUD_CONTAINER } from '../config/env'
 import { clearSession, getAccessToken, getRefreshToken, setAccessToken } from './session'
 import { recordErrorLog } from './monitor'
 
@@ -10,6 +10,17 @@ const inflight = new Map()
 const cacheStore = new Map()
 let refreshPromise = null
 
+function shouldUseCloudContainer() {
+  return Boolean(
+    USE_CLOUD_CONTAINER &&
+      TCB_ENV &&
+      TCB_SERVICE &&
+      typeof wx !== 'undefined' &&
+      wx.cloud &&
+      wx.cloud.callContainer,
+  )
+}
+
 function generateTraceId() {
   const rnd = Math.random().toString(36).slice(2, 10)
   return `mp_${Date.now().toString(36)}_${rnd}`
@@ -17,6 +28,15 @@ function generateTraceId() {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function normalizeBaseUrl(value) {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
+
+function getHttpBaseUrls() {
+  const bases = [normalizeBaseUrl(API_BASE), normalizeBaseUrl(API_FALLBACK_BASE)].filter(Boolean)
+  return [...new Set(bases)]
 }
 
 function createRequestError({ message, code, statusCode, url, method, raw }) {
@@ -111,20 +131,28 @@ async function requestByCloudContainer({ url, method, data, header }) {
   }
 }
 
-async function requestByHttp({ url, method, data, header, timeoutMs }) {
-  const [error, response] = await uni.request({
-    url: `${API_BASE}${url}`,
+async function requestByHttp({ baseUrl, url, method, data, header, timeoutMs }) {
+  const response = await uni.request({
+    url: `${normalizeBaseUrl(baseUrl)}${url}`,
     method,
     data,
     header,
     timeout: timeoutMs,
   })
-
-  if (error) {
-    throw error
-  }
-
   return response
+}
+
+async function requestByHttpWithFallback({ url, method, data, header, timeoutMs }) {
+  const bases = getHttpBaseUrls()
+  let lastError = null
+  for (const baseUrl of bases) {
+    try {
+      return await requestByHttp({ baseUrl, url, method, data, header, timeoutMs })
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError || new Error('当前环境不支持请求')
 }
 
 async function refreshAccessToken() {
@@ -142,12 +170,11 @@ async function refreshAccessToken() {
   const data = { refresh_token: refreshToken }
 
   let response
-  // #ifdef MP-WEIXIN
-  response = await requestByCloudContainer({ url, method, data, header })
-  // #endif
-  // #ifndef MP-WEIXIN
-  response = await requestByHttp({ url, method, data, header, timeoutMs: 12000 })
-  // #endif
+  if (shouldUseCloudContainer()) {
+    response = await requestByCloudContainer({ url, method, data, header })
+  } else {
+    response = await requestByHttpWithFallback({ url, method, data, header, timeoutMs: 12000 })
+  }
 
   const statusCode = response?.statusCode || 0
   const payload = response?.data || {}
@@ -194,13 +221,11 @@ function shouldRetry(err) {
 
 async function executeRequest({ url, upperMethod, data, header, timeoutMs }) {
   let response
-  // #ifdef MP-WEIXIN
-  response = await requestByCloudContainer({ url, method: upperMethod, data, header })
-  // #endif
-
-  // #ifndef MP-WEIXIN
-  response = await requestByHttp({ url, method: upperMethod, data, header, timeoutMs })
-  // #endif
+  if (shouldUseCloudContainer()) {
+    response = await requestByCloudContainer({ url, method: upperMethod, data, header })
+  } else {
+    response = await requestByHttpWithFallback({ url, method: upperMethod, data, header, timeoutMs })
+  }
 
   const statusCode = response.statusCode
   const payload = response.data || {}
