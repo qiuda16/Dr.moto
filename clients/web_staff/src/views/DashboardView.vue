@@ -2,11 +2,7 @@
   <div class="dashboard">
     <section class="hero card">
       <div class="hero-main">
-        <div class="hero-eyebrow">{{ heroEyebrow }}</div>
         <div class="hero-title">{{ heroTitle }}</div>
-        <div class="hero-copy">
-          {{ heroCopy }}
-        </div>
         <div class="hero-actions">
           <el-button type="primary" @click="goQuickIntake">快速接车</el-button>
           <el-button @click="jumpToOrders('in_progress')">看施工中</el-button>
@@ -175,91 +171,6 @@
         </div>
       </div>
 
-      <div class="card ops-card ai-card">
-        <div class="section-title">AI 助手</div>
-        <div class="section-subtitle">{{ assistantSubtitle }}</div>
-        <el-input
-          v-model="assistantPrompt"
-          type="textarea"
-          :rows="3"
-          :placeholder="assistantPlaceholder"
-          @keydown.ctrl.enter.prevent="askAssistant"
-        />
-        <div class="assistant-actions">
-          <div class="assistant-suggestions">
-            <button
-              v-for="item in promptSuggestions"
-              :key="item"
-              type="button"
-              class="assistant-chip"
-              @click="usePrompt(item)"
-            >
-              {{ item }}
-            </button>
-          </div>
-          <el-button type="primary" :loading="assistantLoading" @click="askAssistant">询问 AI</el-button>
-        </div>
-
-        <div v-if="assistantReply" class="assistant-result">
-          <div class="assistant-result-head">
-            <div>
-              <strong>AI 回答</strong>
-              <div class="assistant-result-subtitle">先给结论，再给建议动作和参考来源。</div>
-            </div>
-            <div class="assistant-inline-actions">
-              <el-button text @click="retryAssistant">重试</el-button>
-              <el-button text @click="copyAssistantAnswer">复制</el-button>
-            </div>
-          </div>
-          <div v-if="assistantReply.meta?.length" class="assistant-meta">
-            <span
-              v-for="(item, index) in assistantReply.meta"
-              :key="`${item.label}-${index}`"
-              :class="['assistant-meta-chip', `assistant-meta-chip-${item.tone || 'muted'}`]"
-            >
-              {{ item.label }}
-            </span>
-          </div>
-          <div class="assistant-result-body">{{ assistantReply.response }}</div>
-          <div v-if="assistantReply.action_cards?.length" class="assistant-action-list">
-            <div v-for="(item, index) in assistantReply.action_cards" :key="`${item.action}-${index}`" class="assistant-action-card">
-              <strong>{{ item.label || '建议动作' }}</strong>
-              <span>{{ item.description || item.action }}</span>
-            </div>
-          </div>
-          <div v-if="assistantReply.sources?.length" class="assistant-source-list">
-            <div
-              v-for="(item, index) in assistantReply.sources"
-              :key="`${item.type || 'source'}-${index}`"
-              class="assistant-source-item"
-            >
-              <strong>{{ item.label || sourceTypeLabel(item.type) }}</strong>
-              <span>{{ item.summary || sourceTypeLabel(item.type) }}</span>
-            </div>
-          </div>
-          <div v-if="assistantReply.suggested_actions?.length" class="assistant-result-tags">
-            <button
-              v-for="(item, index) in assistantReply.suggested_actions"
-              :key="`${item}-${index}`"
-              type="button"
-              @click="runActionSuggestion(item)"
-            >
-              {{ item }}
-            </button>
-          </div>
-        </div>
-
-        <div v-else-if="assistantLoading" class="assistant-empty assistant-empty-pending">
-          <strong>AI 正在整理上下文</strong>
-          <span>会先看门店总览，再结合你当前的问题给结论。</span>
-        </div>
-
-        <div v-else class="assistant-empty">
-          <strong>这里会显示 AI 回答</strong>
-          <span>适合快速问运营重点、工单优先级、待交付风险，或者某张单下一步该怎么做。</span>
-        </div>
-      </div>
-
       <div class="card ops-card">
         <div class="section-title">建议先做的事</div>
         <div class="ops-list">
@@ -279,6 +190,152 @@
       </div>
     </section>
 
+    <button v-if="!assistantOpen" type="button" class="ai-float-trigger" @click="openAssistant">
+      <span class="ai-float-trigger-icon">AI</span>
+      <span class="ai-float-trigger-text">助手</span>
+    </button>
+
+    <transition name="ai-panel-slide">
+      <aside v-if="assistantOpen" class="ai-panel">
+        <div class="ai-panel-header">
+          <div>
+            <div class="section-title">AI 助手</div>
+            <div class="ai-panel-subtitle">{{ assistantSubtitle }}</div>
+          </div>
+          <div class="ai-panel-actions">
+            <el-button text @click="clearAssistantConversation">清空</el-button>
+            <el-button text @click="closeAssistant">关闭</el-button>
+          </div>
+        </div>
+
+        <div ref="assistantScrollRef" class="ai-panel-history">
+          <div
+            v-for="message in assistantMessages"
+            :key="message.id"
+            :class="['ai-message', `ai-message-${message.role}`]"
+          >
+            <div class="ai-message-bubble">
+              <div v-if="message.role === 'assistant' && message.meta?.length" class="assistant-meta">
+                <span
+                  v-for="(item, index) in message.meta"
+                  :key="`${message.id}-${item.label}-${index}`"
+                  :class="['assistant-meta-chip', `assistant-meta-chip-${item.tone || 'muted'}`]"
+                >
+                  {{ item.label }}
+                </span>
+              </div>
+
+              <div v-if="message.role === 'assistant'" class="assistant-response-stack">
+                <div v-if="assistantResponseSummary(message.text).length" class="assistant-summary-card">
+                  <div class="assistant-summary-label">结论摘要</div>
+                  <div class="assistant-summary-text">{{ assistantResponseSummary(message.text)[0] }}</div>
+                </div>
+
+                <div
+                  v-for="section in assistantResponseSections(message.text)"
+                  :key="`${message.id}-${section.title}`"
+                  class="assistant-response-section"
+                  :class="[`assistant-response-section-${section.kind}`]"
+                >
+                  <div class="assistant-response-section-head">
+                    <strong>{{ section.title }}</strong>
+                    <span v-if="section.kind === 'steps'">建议先按顺序执行</span>
+                  </div>
+
+                  <ul v-if="section.kind === 'steps' || section.kind === 'bullets'" class="assistant-response-list">
+                    <li v-for="(item, index) in section.items" :key="`${message.id}-${section.title}-${index}`">
+                      {{ item }}
+                    </li>
+                  </ul>
+
+                  <div v-else class="assistant-response-text">
+                    <p v-for="(item, index) in section.items" :key="`${message.id}-${section.title}-${index}`">
+                      {{ item }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="ai-message-text">{{ message.text }}</div>
+
+              <div v-if="message.action_cards?.length" class="assistant-action-list">
+                <div
+                  v-for="(item, index) in message.action_cards"
+                  :key="`${message.id}-${item.action || 'action'}-${index}`"
+                  class="assistant-action-card"
+                >
+                  <strong>{{ item.label || '建议动作' }}</strong>
+                  <span>{{ item.description || item.action }}</span>
+                </div>
+              </div>
+
+              <div v-if="message.sources?.length" class="assistant-source-list">
+                <div
+                  v-for="(item, index) in message.sources"
+                  :key="`${message.id}-${item.type || 'source'}-${index}`"
+                  class="assistant-source-item"
+                >
+                  <strong>{{ item.label || sourceTypeLabel(item.type) }}</strong>
+                  <span>{{ item.summary || sourceTypeLabel(item.type) }}</span>
+                </div>
+              </div>
+
+              <div v-if="message.suggested_actions?.length" class="assistant-result-tags">
+                <button
+                  v-for="(item, index) in message.suggested_actions"
+                  :key="`${message.id}-${item}-${index}`"
+                  type="button"
+                  @click="runActionSuggestion(item)"
+                >
+                  {{ item }}
+                </button>
+              </div>
+
+              <div v-if="message.role === 'assistant' && message.prompt" class="ai-message-tools">
+                <el-button text size="small" @click="retryMessage(message)">重试</el-button>
+                <el-button text size="small" @click="copyMessage(message)">复制</el-button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="assistantLoading" class="ai-message ai-message-assistant">
+            <div class="ai-message-bubble ai-message-pending">
+              <strong>正在整理上下文</strong>
+              <span>会先看门店总览，再结合你当前的问题给结论。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-panel-composer">
+          <div class="assistant-suggestions">
+            <button
+              v-for="item in promptSuggestions"
+              :key="item"
+              type="button"
+              class="assistant-chip"
+              @click="usePrompt(item)"
+            >
+              {{ item }}
+            </button>
+          </div>
+
+          <el-input
+            v-model="assistantInput"
+            class="ai-composer-input"
+            type="textarea"
+            :rows="3"
+            :placeholder="assistantPlaceholder"
+            @keydown.enter.exact.prevent="askAssistant"
+          />
+
+          <div class="ai-panel-submit">
+            <span class="ai-panel-hint">Enter 发送，Shift + Enter 换行</span>
+            <el-button type="primary" :loading="assistantLoading" @click="askAssistant">发送</el-button>
+          </div>
+        </div>
+      </aside>
+    </transition>
+
     <section class="card recent-section">
       <div class="recent-head">
         <div>
@@ -292,7 +349,13 @@
         </div>
       </div>
 
-      <el-table :data="overview.recent.orders" v-loading="loading" style="width: 100%">
+      <el-table
+        :data="overview.recent.orders"
+        v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.recentOrders"
+        style="width: 100%"
+      >
         <el-table-column prop="id" label="工单号" min-width="240" />
         <el-table-column prop="vehicle_plate" label="车牌" width="140" />
         <el-table-column label="提醒" width="180">
@@ -319,18 +382,22 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import request from '../utils/request'
+import { getAuthToken } from '../utils/auth'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const router = useRouter()
 const loading = ref(false)
 const assistantLoading = ref(false)
+const assistantOpen = ref(false)
 const appSettings = reactive(createAppSettingsState())
-const assistantPrompt = ref('')
-const assistantReply = ref(null)
+const assistantInput = ref('')
+const assistantMessages = ref([createAssistantWelcomeMessage()])
+const assistantScrollRef = ref(null)
 
 const overview = reactive({
   orders: { total: 0, active: 0, done: 0, status_counts: {} },
@@ -366,12 +433,7 @@ const focusCount = computed(() =>
 )
 
 const normalizedStoreName = computed(() => String(appSettings.store_name || '').trim() || '机车博士')
-const heroEyebrow = computed(() => `${normalizedStoreName.value} · 今日门店总览`)
-const heroTitle = computed(() => `先看清 ${normalizedStoreName.value} 今天要处理什么，再进入具体工单`)
-const heroCopy = computed(
-  () =>
-    `今天新建工单 ${overview.kpi.today_new_orders} 单，已完成 ${overview.kpi.today_done_orders} 单，当前需要优先关注的在场车辆共有 ${focusCount.value} 项。`,
-)
+const heroTitle = computed(() => '机车博士')
 const workshopSubtitle = computed(
   () => `先看 ${normalizedStoreName.value} 当前技师和工位有没有压单，再决定今天怎么排施工和交付。`,
 )
@@ -422,6 +484,130 @@ function buildAssistantMeta(data) {
   return items
 }
 
+function normalizeAssistantResponseText(text) {
+  return String(text || '')
+    .replace(/\r/g, '')
+    .replace(/\s*(当前客户是|车辆为|当前工单|本次工单主诉是|当前已选项目包括|系统推荐下一步关注|接车快检记录为|下一步建议|应急建议|应急模式|重点关注|建议如下)[:：]\s*/g, '\n$1：')
+    .replace(/(下一步建议|应急建议|应急模式|重点关注|建议如下)[:：]\s*(\d+[.、)])\s*/g, '$1：\n$2 ')
+    .replace(/([。！？;；])\s*(\d+[.、)])\s*/g, '$1\n$2 ')
+    .replace(/\n\s*(\d+[.、)])\s*/g, '\n$1 ')
+    .trim()
+}
+
+function assistantResponseSummary(text) {
+  const normalized = normalizeAssistantResponseText(text)
+  if (!normalized) return []
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean)
+  const summary = []
+  for (const line of lines) {
+    if (/^(当前客户是|车辆为|当前工单|本次工单主诉是|当前已选项目包括|系统推荐下一步关注|接车快检记录为|下一步建议|应急建议|应急模式|重点关注|建议如下)[:：]/.test(line)) {
+      continue
+    }
+    if (/^\d+[.、)]\s*/.test(line)) {
+      continue
+    }
+    summary.push(line)
+    if (summary.length >= 1) break
+  }
+  return summary
+}
+
+function assistantResponseSections(text) {
+  const normalized = normalizeAssistantResponseText(text)
+  if (!normalized) return []
+
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean)
+  const sections = []
+  let current = null
+  let summarySkipped = false
+
+  const pushCurrent = () => {
+    if (current && current.items.length) sections.push(current)
+    current = null
+  }
+
+  const startSection = (title, kind = 'text') => {
+    pushCurrent()
+    current = { key: `${title}-${sections.length}`, title, kind, items: [] }
+  }
+
+  for (const line of lines) {
+    const headingMatch = line.match(
+      /^(当前客户是|车辆为|当前工单|本次工单主诉是|当前已选项目包括|系统推荐下一步关注|接车快检记录为|下一步建议|应急建议|应急模式|重点关注|建议如下)[:：]\s*(.*)$/,
+    )
+    if (headingMatch) {
+      const title = headingMatch[1]
+      const kind = /^(下一步建议|应急建议|重点关注|建议如下)$/.test(title) ? 'steps' : 'text'
+      startSection(title, kind)
+      if (headingMatch[2]) current.items.push(headingMatch[2])
+      summarySkipped = true
+      continue
+    }
+
+    const stepMatch = line.match(/^(\d+)[.、)]\s*(.*)$/)
+    if (stepMatch) {
+      if (!current || current.kind !== 'steps') {
+        startSection('下一步建议', 'steps')
+      }
+      current.items.push(stepMatch[2] || line)
+      summarySkipped = true
+      continue
+    }
+
+    if (!summarySkipped) {
+      summarySkipped = true
+      continue
+    }
+
+    if (!current) {
+      startSection('补充说明', 'text')
+    }
+    current.items.push(line)
+  }
+
+  pushCurrent()
+  return sections
+}
+
+function makeAssistantMessageId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+}
+
+function createAssistantWelcomeMessage() {
+  return {
+    id: makeAssistantMessageId(),
+    role: 'assistant',
+    text: '这里会像聊天窗口一样记录对话。你可以直接问我今天先盯什么、哪台车最急，或者某张工单下一步怎么做。',
+    meta: [
+      { tone: 'info', label: '聊天历史' },
+      { tone: 'muted', label: '底部输入' },
+    ],
+  }
+}
+
+function scrollAssistantToBottom() {
+  nextTick(() => {
+    const el = assistantScrollRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
+
+function openAssistant() {
+  assistantOpen.value = true
+  scrollAssistantToBottom()
+}
+
+function closeAssistant() {
+  assistantOpen.value = false
+}
+
+function clearAssistantConversation() {
+  assistantMessages.value = [createAssistantWelcomeMessage()]
+  assistantInput.value = ''
+  assistantLoading.value = false
+  scrollAssistantToBottom()
+}
+
 function currency(value) {
   return Number(value || 0).toLocaleString('zh-CN', {
     minimumFractionDigits: 0,
@@ -460,10 +646,11 @@ function statusTagType(status) {
 }
 
 function resetAssistantPrompt() {
-  assistantPrompt.value = `帮我总结${normalizedStoreName.value}今天最需要优先跟进的事项，并建议下一步。`
+  assistantInput.value = `帮我总结${normalizedStoreName.value}今天最需要优先跟进的事项，并建议下一步。`
 }
 
 async function loadAppSettings() {
+  if (!getAuthToken()) return
   try {
     const data = await request.get('/mp/settings')
     applyAppSettings(appSettings, data)
@@ -471,6 +658,9 @@ async function loadAppSettings() {
     applyAppSettings(appSettings)
   } finally {
     resetAssistantPrompt()
+    if (assistantMessages.value.length === 1 && assistantMessages.value[0].role === 'assistant') {
+      assistantMessages.value = [createAssistantWelcomeMessage()]
+    }
   }
 }
 
@@ -493,11 +683,20 @@ async function loadOverview() {
 }
 
 async function askAssistant() {
-  const message = String(assistantPrompt.value || '').trim()
+  const message = String(assistantInput.value || '').trim()
   if (!message) {
     ElMessage.warning('请先输入问题')
     return
   }
+
+  assistantOpen.value = true
+  assistantMessages.value.push({
+    id: makeAssistantMessageId(),
+    role: 'user',
+    text: message,
+  })
+  assistantInput.value = ''
+  scrollAssistantToBottom()
 
   assistantLoading.value = true
   try {
@@ -507,42 +706,51 @@ async function askAssistant() {
         store_overview: overview,
       },
     })
-    assistantReply.value = {
-      response: data?.response || 'AI 暂时没有返回内容。',
+    assistantMessages.value.push({
+      id: makeAssistantMessageId(),
+      role: 'assistant',
+      text: data?.response || 'AI 暂时没有返回内容。',
       suggested_actions: data?.suggested_actions || [],
       action_cards: data?.action_cards || [],
       sources: data?.sources || [],
       meta: buildAssistantMeta(data),
       prompt: message,
-    }
+    })
   } catch (error) {
-    assistantReply.value = null
+    assistantMessages.value.push({
+      id: makeAssistantMessageId(),
+      role: 'assistant',
+      text: error?.message || 'AI 助手暂时不可用',
+      meta: [{ tone: 'warn', label: '请求失败' }],
+      prompt: message,
+    })
     ElMessage.error(error?.message || 'AI 助手暂时不可用')
   } finally {
     assistantLoading.value = false
+    scrollAssistantToBottom()
   }
 }
 
 function usePrompt(prompt) {
-  assistantPrompt.value = prompt
+  assistantInput.value = prompt
   askAssistant()
 }
 
 function runActionSuggestion(prompt) {
-  assistantPrompt.value = prompt
+  assistantInput.value = prompt
   askAssistant()
 }
 
-function retryAssistant() {
-  if (!assistantReply.value?.prompt) return
-  assistantPrompt.value = assistantReply.value.prompt
+function retryMessage(message) {
+  if (!message?.prompt) return
+  assistantInput.value = message.prompt
   askAssistant()
 }
 
-async function copyAssistantAnswer() {
-  if (!assistantReply.value?.response) return
+async function copyMessage(message) {
+  if (!message?.text) return
   try {
-    await navigator.clipboard.writeText(assistantReply.value.response)
+    await navigator.clipboard.writeText(message.text)
     ElMessage.success('已复制')
   } catch {
     ElMessage.warning('复制失败，请手动复制')
@@ -601,24 +809,11 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.hero-eyebrow {
-  color: #0f6cbd;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
 .hero-title {
-  font-size: 28px;
+  font-size: 36px;
   line-height: 1.25;
   font-weight: 700;
   color: #0f172a;
-}
-
-.hero-copy {
-  margin-top: 12px;
-  color: #475569;
-  line-height: 1.75;
 }
 
 .hero-actions {
@@ -683,7 +878,7 @@ onBeforeUnmount(() => {
 }
 
 .ops-grid {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .metric-card,
@@ -835,6 +1030,267 @@ onBeforeUnmount(() => {
   background: #eff6ff;
   color: #0f6cbd;
   cursor: pointer;
+}
+
+.ai-float-trigger {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px 14px 16px;
+  border: none;
+  border-radius: 18px 0 0 18px;
+  background: linear-gradient(180deg, #0f172a 0%, #1f3b5b 100%);
+  color: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+}
+
+.ai-float-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(38, 149, 214, 0.18);
+  color: #7dd3fc;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.ai-float-trigger-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ai-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: min(440px, calc(100vw - 32px));
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(213, 229, 239, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.ai-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #e3edf4;
+}
+
+.ai-panel-subtitle {
+  color: #64748b;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-panel-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ai-panel-history {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background:
+    radial-gradient(circle at top, rgba(38, 149, 214, 0.05), transparent 34%),
+    linear-gradient(180deg, rgba(248, 251, 254, 0.96), rgba(243, 248, 252, 0.98));
+}
+
+.ai-message {
+  display: flex;
+}
+
+.ai-message-user {
+  justify-content: flex-end;
+}
+
+.ai-message-assistant {
+  justify-content: flex-start;
+}
+
+.ai-message-bubble {
+  max-width: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid #d7e4ee;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.ai-message-user .ai-message-bubble {
+  background: linear-gradient(180deg, #0f6cbd 0%, #2d9cdb 100%);
+  color: #fff;
+  border-color: transparent;
+  border-bottom-right-radius: 6px;
+}
+
+.ai-message-assistant .ai-message-bubble {
+  border-bottom-left-radius: 6px;
+}
+
+.ai-message-text {
+  white-space: pre-wrap;
+  line-height: 1.72;
+  font-size: 14px;
+}
+
+.assistant-response-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.assistant-summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f1f7ff 0%, #ffffff 100%);
+  border: 1px solid #cfe0fb;
+}
+
+.assistant-summary-label {
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.assistant-summary-text {
+  color: #0f172a;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.assistant-response-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #dbe7f2;
+  background: #f8fbfe;
+}
+
+.assistant-response-section-steps {
+  background: linear-gradient(180deg, #fffaf2 0%, #ffffff 100%);
+  border-color: #f2d7a8;
+}
+
+.assistant-response-section-text {
+  background: #f8fbfe;
+}
+
+.assistant-response-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.assistant-response-section-head strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.assistant-response-section-head span {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.assistant-response-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #1f2937;
+  line-height: 1.7;
+}
+
+.assistant-response-text {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  line-height: 1.72;
+}
+
+.assistant-response-text p {
+  margin: 0;
+}
+
+.ai-message-pending {
+  border-style: dashed;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef6fd 100%);
+}
+
+.ai-message-pending strong {
+  color: #0f172a;
+}
+
+.ai-message-pending span {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.ai-message-tools {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ai-panel-composer {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border-top: 1px solid #e3edf4;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.ai-composer-input :deep(.el-textarea__inner) {
+  min-height: 88px;
+  border-radius: 16px;
+  padding: 14px 16px;
+  resize: none;
+}
+
+.ai-panel-submit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-panel-hint {
+  color: #7a8ca1;
+  font-size: 12px;
 }
 
 .assistant-result,
@@ -1025,6 +1481,31 @@ onBeforeUnmount(() => {
 
   .assistant-actions {
     flex-direction: column;
+  }
+
+  .ai-float-trigger {
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+    transform: none;
+    border-radius: 999px;
+    padding: 12px 14px;
+  }
+
+  .ai-float-trigger-text {
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
+    letter-spacing: 0.04em;
+  }
+}
+
+@media (max-width: 720px) {
+  .ai-float-trigger {
+    padding: 10px 12px;
+  }
+
+  .ai-float-trigger-text {
+    display: none;
   }
 }
 </style>

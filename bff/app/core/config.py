@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
     ENABLE_METRICS: bool = True
     METRICS_PATH: str = "/metrics"
+    MAX_REQUEST_BODY_BYTES: int = 2 * 1024 * 1024
+    BFF_MAX_REQUEST_BODY_BYTES: Optional[int] = None
     DEFAULT_STORE_ID: str = "default"
     CORS_ORIGINS: str = "*"
     ENABLE_DEV_ENDPOINTS: bool = True
@@ -69,6 +71,11 @@ class Settings(BaseSettings):
 
     # AI / OCR
     AI_URL: str = "http://ai:8000"
+    AI_PROXY_TIMEOUT_SECONDS: float = 300.0
+    AI_PROXY_POOL_TIMEOUT_SECONDS: float = 1.0
+    AI_PROXY_MAX_INFLIGHT: int = 24
+    AI_PROXY_QUEUE_WAIT_SECONDS: float = 1.2
+    AI_PREFETCH_TIMEOUT_SECONDS: float = 6.0
     OCR_REQUEST_TIMEOUT_SECONDS: int = 1800
 
     # Idempotency
@@ -122,6 +129,8 @@ class Settings(BaseSettings):
             self.REDIS_URL = self.BFF_REDIS_URL
         if self.BFF_DATABASE_URL and self.DATABASE_URL == "postgresql://odoo:odoo@db:5432/bff":
             self.DATABASE_URL = self.BFF_DATABASE_URL
+        if self.BFF_MAX_REQUEST_BODY_BYTES is not None:
+            self.MAX_REQUEST_BODY_BYTES = int(self.BFF_MAX_REQUEST_BODY_BYTES)
 
         # 兼容 wxcloudrun-flask MySQL 变量：MYSQL_ADDRESS / MYSQL_USERNAME / MYSQL_PASSWORD
         if self.MYSQL_ADDRESS and self.MYSQL_USERNAME and self.MYSQL_PASSWORD:

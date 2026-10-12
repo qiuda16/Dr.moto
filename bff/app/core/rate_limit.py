@@ -1,8 +1,10 @@
 import redis
+import logging
 
 from .config import settings
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL)
+logger = logging.getLogger("bff")
 
 
 def _key(scope: str, identifier: str) -> str:
@@ -14,7 +16,12 @@ def check_rate_limit(scope: str, identifier: str, max_attempts: int, window_seco
     Return True when request is allowed, False when blocked.
     """
     key = _key(scope, identifier)
-    count = redis_client.incr(key)
-    if count == 1:
-        redis_client.expire(key, window_seconds)
-    return count <= max_attempts
+    try:
+        count = redis_client.incr(key)
+        if count == 1:
+            redis_client.expire(key, window_seconds)
+        return count <= max_attempts
+    except Exception as exc:
+        # Fail-open: auth path should remain available when Redis is unavailable.
+        logger.warning("Rate limit backend unavailable, fail-open for scope=%s: %s", scope, exc)
+        return True

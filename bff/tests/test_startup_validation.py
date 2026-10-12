@@ -44,3 +44,31 @@ def test_production_startup_validation_wechat_missing_keys():
         for key, value in original.items():
             setattr(settings, key, value)
 
+
+def test_production_startup_validation_accepts_offline_trial_payments():
+    original = {
+        "SECRET_KEY": settings.SECRET_KEY,
+        "ADMIN_PASSWORD": settings.ADMIN_PASSWORD,
+        "ADMIN_PASSWORD_HASH": settings.ADMIN_PASSWORD_HASH,
+        "ENABLE_DEV_ENDPOINTS": settings.ENABLE_DEV_ENDPOINTS,
+        "ENABLE_MOCK_PAYMENT": settings.ENABLE_MOCK_PAYMENT,
+        "PAYMENT_PROVIDER": settings.PAYMENT_PROVIDER,
+        "WEBHOOK_SHARED_SECRET": settings.WEBHOOK_SHARED_SECRET,
+        "PAYMENT_WEBHOOK_SECRET": settings.PAYMENT_WEBHOOK_SECRET,
+    }
+    try:
+        settings.SECRET_KEY = "strong-secret"
+        settings.ADMIN_PASSWORD = "strong-password"
+        settings.ADMIN_PASSWORD_HASH = None
+        settings.ENABLE_DEV_ENDPOINTS = False
+        settings.ENABLE_MOCK_PAYMENT = False
+        settings.PAYMENT_PROVIDER = "offline"
+        settings.WEBHOOK_SHARED_SECRET = "hook-secret"
+        settings.PAYMENT_WEBHOOK_SECRET = "pay-secret"
+
+        issues = collect_production_startup_issues()
+        assert not any("PAYMENT_PROVIDER" in issue for issue in issues)
+    finally:
+        for key, value in original.items():
+            setattr(settings, key, value)
+

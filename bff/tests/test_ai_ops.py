@@ -15,7 +15,7 @@ from app.main import app
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.db import Base, SessionLocal, engine
-from app.models import PartCatalogItem, PartCatalogProfile, WorkOrder
+from app.models import PartCatalogItem, PartCatalogProfile, VehicleCatalogModel, VehicleServicePackage, VehicleServicePackageItem, VehicleServiceTemplateItem, WorkOrder
 
 
 class FakeRedis:
@@ -135,6 +135,127 @@ def test_ai_ops_context_and_actions():
     quote_payload = quote_resp.json()["result"]
     assert quote_payload["version"] == 1
     assert quote_payload["amount_total"] == 340.0
+
+
+def test_ai_ops_context_returns_service_items():
+    headers = _admin_headers()
+    model_code = f"AI-SVC-MODEL-{uuid.uuid4().hex[:8].upper()}"
+    service_name = f"AI单测标准项目-{uuid.uuid4().hex[:8].upper()}"
+    repair_method = "拆装火花塞并检查燃烧情况，按规范力矩安装新火花塞，确认点火顺畅。"
+
+    db = SessionLocal()
+    try:
+        model = VehicleCatalogModel(
+            brand="DrMoto",
+            model_name="AI 单测车型",
+            category="test",
+            year_from=2024,
+            year_to=2026,
+            is_active=True,
+        )
+        db.add(model)
+        db.flush()
+        db.add(
+            VehicleServiceTemplateItem(
+                model_id=model.id,
+                part_name=service_name,
+                part_code=model_code,
+                repair_method=repair_method,
+                labor_hours=0.8,
+                notes="service item test",
+                sort_order=1,
+                is_active=True,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    context = client.get(f"/ai/ops/context?query={service_name}", headers=headers)
+    assert context.status_code == 200
+    context_payload = context.json()
+    assert "service_items" in context_payload
+    assert context_payload["service_items"]
+    assert any(item["service_name"] == service_name for item in context_payload["service_items"])
+    match = next(item for item in context_payload["service_items"] if item["service_name"] == service_name)
+    assert match["repair_method"] == repair_method
+    assert "service_items" in context_payload["query_domains"]
+    assert context_payload["primary_domain"] == "service_items"
+
+
+def test_ai_ops_context_returns_shop_items_and_ai_answers_them():
+    headers = _admin_headers()
+    service_name = f"AI商城服务-{uuid.uuid4().hex[:8].upper()}"
+    package_name = f"AI商城套餐-{uuid.uuid4().hex[:8].upper()}"
+    repair_method = "拆装火花塞并检查燃烧情况，按规范力矩安装新火花塞，确认点火顺畅。"
+
+    db = SessionLocal()
+    try:
+        model = VehicleCatalogModel(
+            brand="DrMoto",
+            model_name="AI 商城车型",
+            category="test",
+            year_from=2024,
+            year_to=2026,
+            is_active=True,
+        )
+        db.add(model)
+        db.flush()
+        service_item = VehicleServiceTemplateItem(
+            model_id=model.id,
+            part_name=service_name,
+            part_code=f"SHOP-SVC-{uuid.uuid4().hex[:6].upper()}",
+            repair_method=repair_method,
+            labor_hours=1.0,
+            notes="shop service test",
+            sort_order=1,
+            is_active=True,
+        )
+        db.add(service_item)
+        db.flush()
+        package = VehicleServicePackage(
+            model_id=model.id,
+            package_name=package_name,
+            package_code=f"SHOP-PKG-{uuid.uuid4().hex[:6].upper()}",
+            description="AI商城套餐测试",
+            suggested_price_total=288.0,
+            is_active=True,
+            sort_order=1,
+        )
+        db.add(package)
+        db.flush()
+        db.add(
+            VehicleServicePackageItem(
+                package_id=package.id,
+                template_item_id=service_item.id,
+                sort_order=1,
+                is_optional=False,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    context = client.get("/ai/ops/context?query=%E5%95%86%E5%9F%8E", headers=headers)
+    assert context.status_code == 200
+    context_payload = context.json()
+    assert "shop_items" in context_payload
+    assert context_payload["shop_items"]
+    assert context_payload["primary_domain"] == "shop"
+
+    chat = client.post(
+        "/ai/assistant/chat",
+        headers=headers,
+        json={
+            "message": "请直接告诉我商城里有什么商品。",
+            "user_id": "ai-test",
+            "context": context_payload,
+        },
+    )
+    assert chat.status_code == 200
+    response_text = chat.json()["response"]
+    assert package_name in response_text or service_name in response_text
+    assert "商品" in response_text
 
 
 def test_ai_ops_create_and_update_part():

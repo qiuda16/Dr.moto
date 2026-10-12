@@ -36,6 +36,7 @@ class VehicleHealthRecordResponse(BaseModel):
     customer_id: str
     vehicle_plate: str
     measured_at: datetime
+    created_at: Optional[datetime] = None
     odometer_km: float
     engine_rpm: Optional[float] = None
     battery_voltage: Optional[float] = None

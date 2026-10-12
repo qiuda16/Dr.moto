@@ -3,7 +3,7 @@
     <div class="card settings-head">
       <div>
         <h2>门店设置</h2>
-        <p>这里只管理高频默认值，不改变系统布局。保存后，工单中心、主数据中心和壳层标题会自动使用新设置。</p>
+        <p>这里管理高频默认值和单据模板口径。保存后，工单中心、主数据中心、首页和单据输出会自动使用最新设置。</p>
       </div>
       <div class="head-actions">
         <el-button @click="loadSettings">刷新</el-button>
@@ -15,16 +15,16 @@
       <div class="card">
         <div class="section-title">门店信息</div>
         <el-form :model="form" label-width="110px">
-          <el-form-item label="店名">
+          <el-form-item :label="requiredLabel('店名')">
             <el-input v-model="form.store_name" maxlength="120" show-word-limit />
           </el-form-item>
-          <el-form-item label="品牌名">
+          <el-form-item :label="requiredLabel('品牌名')">
             <el-input v-model="form.brand_name" maxlength="80" show-word-limit />
           </el-form-item>
           <el-form-item label="角标文字">
             <el-input v-model="form.sidebar_badge_text" maxlength="40" show-word-limit />
           </el-form-item>
-          <el-form-item label="主色">
+          <el-form-item :label="requiredLabel('主色')">
             <div class="color-row">
               <el-input v-model="form.primary_color" maxlength="32" />
               <span class="color-preview" :style="{ backgroundColor: form.primary_color || '#409EFF' }"></span>
@@ -42,8 +42,26 @@
           <el-form-item label="默认交车备注">
             <el-input v-model="form.default_delivery_note" type="textarea" :rows="4" maxlength="255" show-word-limit />
           </el-form-item>
+          <el-form-item label="默认售后提醒">
+            <el-input v-model="form.default_service_advice" type="textarea" :rows="4" maxlength="255" show-word-limit />
+          </el-form-item>
         </el-form>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">单据模板口径</div>
+      <el-form :model="form" label-width="130px">
+        <el-form-item label="单据页眉说明">
+          <el-input v-model="form.document_header_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+        <el-form-item label="客户联页脚说明">
+          <el-input v-model="form.customer_document_footer_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+        <el-form-item label="内部联页脚说明">
+          <el-input v-model="form.internal_document_footer_note" type="textarea" :rows="3" maxlength="255" show-word-limit />
+        </el-form-item>
+      </el-form>
     </div>
 
     <div class="card">
@@ -67,6 +85,7 @@ import { ElMessage } from 'element-plus'
 
 import request from '../utils/request'
 import { applyAppSettings, createAppSettingsState, dispatchAppSettingsChanged } from '../composables/appSettings'
+import { requiredLabel } from '../utils/labels'
 
 const saving = ref(false)
 const phrasesText = ref('')

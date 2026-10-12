@@ -1,23 +1,23 @@
 ALTER TABLE work_orders
-    ADD CONSTRAINT uq_work_orders_uuid UNIQUE USING INDEX ix_work_orders_uuid;
+    ADD CONSTRAINT uq_work_orders_uuid UNIQUE (uuid);
 
 ALTER TABLE vehicles
-    ADD CONSTRAINT uq_vehicles_key UNIQUE USING INDEX ix_vehicles_key;
+    ADD CONSTRAINT uq_vehicles_key UNIQUE (key);
 
 ALTER TABLE part_catalog_profiles
-    ADD CONSTRAINT uq_part_catalog_profiles_part_id UNIQUE USING INDEX ix_part_catalog_profiles_part_id;
+    ADD CONSTRAINT uq_part_catalog_profiles_part_id UNIQUE (part_id);
 
 ALTER TABLE vehicle_service_template_profiles
-    ADD CONSTRAINT uq_vehicle_service_template_profiles_template_item_id UNIQUE USING INDEX ix_vehicle_service_template_profiles_template_item_id;
+    ADD CONSTRAINT uq_vehicle_service_template_profiles_template_item_id UNIQUE (template_item_id);
 
 ALTER TABLE work_order_process_records
-    ADD CONSTRAINT uq_work_order_process_records_work_order_uuid UNIQUE USING INDEX ix_work_order_process_records_work_order_uuid;
+    ADD CONSTRAINT uq_work_order_process_records_work_order_uuid UNIQUE (work_order_uuid);
 
 ALTER TABLE work_order_delivery_checklists
-    ADD CONSTRAINT uq_work_order_delivery_checklists_work_order_uuid UNIQUE USING INDEX ix_work_order_delivery_checklists_work_order_uuid;
+    ADD CONSTRAINT uq_work_order_delivery_checklists_work_order_uuid UNIQUE (work_order_uuid);
 
 ALTER TABLE work_order_advanced_profiles
-    ADD CONSTRAINT uq_work_order_advanced_profiles_work_order_uuid UNIQUE USING INDEX ix_work_order_advanced_profiles_work_order_uuid;
+    ADD CONSTRAINT uq_work_order_advanced_profiles_work_order_uuid UNIQUE (work_order_uuid);
 
 ALTER TABLE part_catalog_profiles
     ADD CONSTRAINT fk_part_catalog_profiles_part_id

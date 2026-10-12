@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -19,29 +21,43 @@ from ..core.security import create_access_token
 from ..core.text import compact_whitespace, normalize_text
 from ..integrations.odoo import odoo_client
 from ..models import (
+    CustomerAppointmentDraft,
     CustomerAuthSession,
     CustomerSubscriptionPref,
     CustomerWechatBinding,
+    PartCatalogItem,
+    PartCatalogProfile,
     VehicleCatalogModel,
     VehicleHealthRecord,
     VehicleKnowledgeDocument,
+    VehicleServicePackage,
+    VehicleServicePackageItem,
     VehicleServiceTemplateItem,
     VehicleServiceTemplatePart,
     VehicleServiceTemplateProfile,
+    WorkOrder,
+    WorkOrderOfflinePayment,
+    Quote,
 )
+from ..schemas.customer import CustomerVehicleCreate
 from ..schemas.mp_customer import (
     CustomerBindRequest,
     CustomerBindResponse,
+    CustomerAppointmentDraftCreate,
+    CustomerAppointmentDraftResponse,
     CustomerHomeSummaryResponse,
     CustomerMaintenanceListResponse,
     CustomerProfileResponse,
     CustomerRefreshRequest,
     CustomerRefreshResponse,
+    CustomerShopProductDetailResponse,
+    CustomerShopProductListResponse,
     CustomerSubscriptionPrefUpsert,
     CustomerVehicleResponse,
     CustomerWechatLoginRequest,
     CustomerWechatLoginResponse,
 )
+from ..schemas.vehicle_health import VehicleHealthRecordCreate
 
 router = APIRouter(prefix="/mp/customer", tags=["MP Customer"])
 logger = logging.getLogger("bff")
@@ -160,15 +176,170 @@ def _load_customer_vehicles(partner_id: int, db: Session) -> list[dict[str, Any]
             {
                 "id": int(row["id"]),
                 "license_plate": _safe_vehicle_plate(row.get("license_plate")),
-                "vin": normalize_text(row.get("vin")),
+                "vin": normalize_text(row.get("vin") or None),
                 "make": make,
                 "model": model_name,
                 "year": year,
-                "engine_code": normalize_text(model.get("engine_code")),
+                "engine_code": normalize_text(model.get("engine_code") or None),
                 "catalog_model_id": _find_catalog_model_id(db, make, model_name, year),
             }
         )
     return result
+
+
+def _build_vehicle_key(vehicle: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            normalize_text(vehicle.get("make")) or "",
+            normalize_text(vehicle.get("model")) or "",
+            str(vehicle.get("year") or ""),
+            normalize_text(vehicle.get("engine_code")) or "-",
+        ]
+    ).upper()
+
+
+def _ensure_vehicle_model(db: Session, vehicle: dict[str, Any]) -> int:
+    vehicle_key = _build_vehicle_key(vehicle)
+    rows = odoo_client.execute_kw("drmoto.vehicle", "search_read", [[["key", "=", vehicle_key]]], {"fields": ["id"], "limit": 1})
+    if rows:
+        return rows[0]["id"]
+    vals = {
+        "key": vehicle_key,
+        "make": vehicle.get("make"),
+        "model": vehicle.get("model"),
+        "year_from": vehicle.get("year"),
+        "year_to": vehicle.get("year"),
+        "engine_code": vehicle.get("engine_code"),
+    }
+    return odoo_client.execute_kw("drmoto.vehicle", "create", [vals])
+
+
+def _create_customer_vehicle(db: Session, partner_id: int, vehicle: CustomerVehicleCreate) -> dict[str, Any]:
+    resolved = {
+        "license_plate": compact_whitespace(vehicle.license_plate),
+        "make": compact_whitespace(vehicle.make),
+        "model": compact_whitespace(vehicle.model),
+        "year": vehicle.year,
+        "engine_code": normalize_text(vehicle.engine_code),
+        "vin": normalize_text(vehicle.vin),
+        "color": normalize_text(vehicle.color),
+    }
+    vehicle_model_id = _ensure_vehicle_model(
+        db,
+        {
+            "make": resolved["make"],
+            "model": resolved["model"],
+            "year": resolved["year"],
+            "engine_code": resolved["engine_code"],
+        },
+    )
+    vals = {
+        "partner_id": partner_id,
+        "vehicle_id": vehicle_model_id,
+        "license_plate": resolved["license_plate"],
+        "vin": resolved["vin"],
+        "color": resolved["color"],
+    }
+    partner_vehicle_id = odoo_client.execute_kw("drmoto.partner.vehicle", "create", [vals])
+    result = odoo_client.execute_kw(
+        "drmoto.partner.vehicle",
+        "read",
+        [[partner_vehicle_id], ["id", "partner_id", "license_plate", "vin", "color", "vehicle_id"]],
+    )[0]
+    vehicle_model = odoo_client.execute_kw(
+        "drmoto.vehicle",
+        "read",
+        [[vehicle_model_id], ["id", "make", "model", "year_from", "engine_code"]],
+    )[0]
+    catalog_model_id = _find_catalog_model_id(
+        db,
+        normalize_text(vehicle_model.get("make")),
+        normalize_text(vehicle_model.get("model")),
+        vehicle_model.get("year_from") if isinstance(vehicle_model.get("year_from"), int) else None,
+    )
+    return {
+        "id": result["id"],
+        "license_plate": _safe_vehicle_plate(result.get("license_plate")),
+        "vin": normalize_text(result.get("vin") or None),
+        "make": normalize_text(vehicle_model.get("make")),
+        "model": normalize_text(vehicle_model.get("model")),
+        "year": vehicle_model.get("year_from") if isinstance(vehicle_model.get("year_from"), int) else None,
+        "engine_code": normalize_text(vehicle_model.get("engine_code") or None),
+        "catalog_model_id": catalog_model_id,
+    }
+
+
+def _to_health_response(row: VehicleHealthRecord, prev: VehicleHealthRecord | None = None) -> dict[str, Any]:
+    odometer_delta = None
+    days_since_prev = None
+    if prev:
+        odometer_delta = float(row.odometer_km - prev.odometer_km)
+        if row.measured_at and prev.measured_at:
+            days_since_prev = (row.measured_at - prev.measured_at).total_seconds() / 86400.0
+    return {
+        "id": row.id,
+        "customer_id": row.customer_id,
+        "vehicle_plate": row.vehicle_plate,
+        "measured_at": row.measured_at,
+        "created_at": row.created_at,
+        "odometer_km": float(row.odometer_km),
+        "engine_rpm": row.engine_rpm,
+        "battery_voltage": row.battery_voltage,
+        "tire_front_psi": row.tire_front_psi,
+        "tire_rear_psi": row.tire_rear_psi,
+        "coolant_temp_c": row.coolant_temp_c,
+        "oil_life_percent": row.oil_life_percent,
+        "notes": row.notes,
+        "extra": row.extra_json,
+        "odometer_delta_from_prev": odometer_delta,
+        "days_since_prev": days_since_prev,
+    }
+
+
+def _apply_customer_quote(db: Session, store_id: str, row: dict, work_order_uuid: str | None) -> None:
+    if not work_order_uuid:
+        return
+    quote = db.query(Quote).filter(
+        Quote.store_id == store_id,
+        Quote.work_order_uuid == work_order_uuid,
+        Quote.is_active.is_(True),
+        Quote.status.in_(["published", "confirmed"]),
+    ).order_by(Quote.version.desc()).first()
+    if not quote:
+        return
+    row["amount_total"] = float(quote.amount_total)
+    row["quote_summary"] = {"version": quote.version, "status": quote.status,
+                            "amount_total": float(quote.amount_total)}
+    if "lines" in row:
+        row["lines"] = [{"name": item.get("name"), "quantity": item.get("qty", 1),
+                         "price_unit": item.get("unit_price", 0),
+                         "price_subtotal": round(item.get("qty", 1) * item.get("unit_price", 0), 2)}
+                        for item in (quote.items_json or [])]
+
+
+def _payment_summary_for_work_order_uuid(db: Session, store_id: str, work_order_uuid: str | None) -> dict[str, Any]:
+    if not work_order_uuid:
+        return {"status": "unpaid", "paid_amount": 0.0, "payment_method": None, "paid_at": None}
+    rows = (
+        db.query(WorkOrderOfflinePayment)
+        .filter(
+            WorkOrderOfflinePayment.store_id == store_id,
+            WorkOrderOfflinePayment.work_order_uuid == work_order_uuid,
+            WorkOrderOfflinePayment.status == "paid",
+        )
+        .order_by(WorkOrderOfflinePayment.received_at.desc(), WorkOrderOfflinePayment.id.desc())
+        .all()
+    )
+    if not rows:
+        return {"status": "unpaid", "paid_amount": 0.0, "payment_method": None, "paid_at": None}
+    total = sum(float(row.amount or 0) for row in rows)
+    latest = rows[0]
+    return {
+        "status": "paid",
+        "paid_amount": total,
+        "payment_method": latest.payment_method,
+        "paid_at": latest.received_at,
+    }
 
 
 def _issue_customer_session(
@@ -530,6 +701,52 @@ async def customer_vehicles(
     return _load_customer_vehicles(ctx["partner_id"], db)
 
 
+@router.post(
+    "/vehicles",
+    response_model=CustomerVehicleResponse,
+    summary="新增车辆",
+)
+async def customer_vehicle_create(
+    payload: CustomerVehicleCreate,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    try:
+        return _create_customer_vehicle(db, ctx["partner_id"], payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("customer vehicle create failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to create customer vehicle")
+
+
+@router.delete(
+    "/vehicles/{vehicle_id}",
+    summary="删除车辆",
+)
+async def customer_vehicle_delete(
+    vehicle_id: int,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    try:
+        rows = odoo_client.execute_kw(
+            "drmoto.partner.vehicle",
+            "search_read",
+            [[["id", "=", vehicle_id], ["partner_id", "=", ctx["partner_id"]]]],
+            {"fields": ["id"], "limit": 1},
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Vehicle record not found")
+        odoo_client.execute_kw("drmoto.partner.vehicle", "unlink", [[vehicle_id]])
+        return {"deleted": 1, "vehicle_id": vehicle_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("customer vehicle delete failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to delete customer vehicle")
+
+
 @router.get(
     "/home",
     response_model=CustomerHomeSummaryResponse,
@@ -626,6 +843,7 @@ async def customer_vehicle_health_records(
             "customer_id": row.customer_id,
             "vehicle_plate": row.vehicle_plate,
             "measured_at": row.measured_at,
+            "created_at": row.created_at,
             "odometer_km": float(row.odometer_km),
             "engine_rpm": row.engine_rpm,
             "battery_voltage": row.battery_voltage,
@@ -638,6 +856,57 @@ async def customer_vehicle_health_records(
         }
         for row in rows
     ]
+
+
+@router.post(
+    "/vehicles/{vehicle_id}/health-records",
+    summary="新增体检记录",
+)
+async def customer_vehicle_health_records_create(
+    vehicle_id: int,
+    payload: VehicleHealthRecordCreate,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    vehicles = _load_customer_vehicles(ctx["partner_id"], db)
+    target = next((v for v in vehicles if v["id"] == vehicle_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="vehicle not found")
+
+    measured_at = payload.measured_at or datetime.now(timezone.utc)
+    row = VehicleHealthRecord(
+        store_id=ctx["store_id"],
+        customer_id=str(ctx["partner_id"]),
+        vehicle_plate=target["license_plate"],
+        measured_at=measured_at,
+        odometer_km=payload.odometer_km,
+        engine_rpm=payload.engine_rpm,
+        battery_voltage=payload.battery_voltage,
+        tire_front_psi=payload.tire_front_psi,
+        tire_rear_psi=payload.tire_rear_psi,
+        coolant_temp_c=payload.coolant_temp_c,
+        oil_life_percent=payload.oil_life_percent,
+        notes=payload.notes,
+        extra_json=payload.extra,
+        created_by=f"customer:{ctx['partner_id']}",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    prev = (
+        db.query(VehicleHealthRecord)
+        .filter(
+            VehicleHealthRecord.store_id == ctx["store_id"],
+            VehicleHealthRecord.customer_id == str(ctx["partner_id"]),
+            VehicleHealthRecord.vehicle_plate == target["license_plate"],
+            VehicleHealthRecord.id != row.id,
+            VehicleHealthRecord.measured_at <= row.measured_at,
+        )
+        .order_by(VehicleHealthRecord.measured_at.desc(), VehicleHealthRecord.id.desc())
+        .first()
+    )
+    return _to_health_response(row, prev)
 
 
 @router.get(
@@ -667,6 +936,9 @@ async def customer_vehicle_maintenance_orders(
         [domain],
         {"fields": fields, "limit": size, "offset": offset, "order": "create_date desc"},
     )
+    for item in items:
+        _apply_customer_quote(db, ctx["store_id"], item, normalize_text(item.get("bff_uuid")))
+        item["payment_summary"] = _payment_summary_for_work_order_uuid(db, ctx["store_id"], normalize_text(item.get("bff_uuid")))
     return {"page": page, "size": size, "total": int(total or 0), "items": items}
 
 
@@ -676,13 +948,14 @@ async def customer_vehicle_maintenance_orders(
 )
 async def customer_maintenance_order_detail(
     order_id: int,
+    db: Session = Depends(get_db),
     ctx: dict = Depends(_decode_customer_context),
 ):
     rows = odoo_client.execute_kw(
         "drmoto.work.order",
         "search_read",
         [[["id", "=", order_id], ["customer_id", "=", ctx["partner_id"]]]],
-        {"fields": ["id", "name", "vehicle_plate", "state", "date_planned", "amount_total", "description"], "limit": 1},
+        {"fields": ["id", "name", "vehicle_plate", "state", "date_planned", "amount_total", "description", "bff_uuid"], "limit": 1},
     )
     if not rows:
         raise HTTPException(status_code=404, detail="order not found")
@@ -690,10 +963,16 @@ async def customer_maintenance_order_detail(
     line_rows = odoo_client.execute_kw(
         "drmoto.work.order.line",
         "search_read",
-        [[["work_order_id", "=", order_id]]],
+        [[["order_id", "=", order_id]]],
         {"fields": ["id", "name", "quantity", "price_unit", "price_subtotal", "product_id"]},
     )
     row["lines"] = line_rows
+    bff_uuid = normalize_text(row.get("bff_uuid"))
+    if not bff_uuid:
+        local = db.query(WorkOrder).filter(WorkOrder.store_id == ctx["store_id"], WorkOrder.odoo_id == order_id).first()
+        bff_uuid = local.uuid if local else None
+    row["payment_summary"] = _payment_summary_for_work_order_uuid(db, ctx["store_id"], bff_uuid)
+    _apply_customer_quote(db, ctx["store_id"], row, bff_uuid)
     return row
 
 
@@ -879,3 +1158,334 @@ async def customer_subscription_upsert(
         "prefer_channel": row.prefer_channel,
         "last_notified_at": row.last_notified_at,
     }
+
+
+def _resolve_vehicle_for_customer(vehicle_id: int | None, db: Session, ctx: dict[str, Any]) -> dict[str, Any] | None:
+    vehicles = _load_customer_vehicles(ctx["partner_id"], db)
+    if not vehicles:
+        return None
+    if vehicle_id:
+        return next((item for item in vehicles if item["id"] == vehicle_id), None)
+    return vehicles[0]
+
+
+def _build_inspection_items(latest: VehicleHealthRecord | None) -> list[dict[str, Any]]:
+    metrics = [
+        ("engine_rpm", "发动机转速", getattr(latest, "engine_rpm", None), "rpm"),
+        ("battery_voltage", "电瓶电压", getattr(latest, "battery_voltage", None), "V"),
+        ("tire_front_psi", "前胎压", getattr(latest, "tire_front_psi", None), "psi"),
+        ("tire_rear_psi", "后胎压", getattr(latest, "tire_rear_psi", None), "psi"),
+        ("coolant_temp_c", "冷却液温度", getattr(latest, "coolant_temp_c", None), "°C"),
+        ("oil_life_percent", "机油寿命", getattr(latest, "oil_life_percent", None), "%"),
+        ("lighting", "灯光", "正常", ""),
+        ("chain_belt", "链条 / 皮带", "待检查", ""),
+    ]
+    items = []
+    for key, label, value, unit in metrics:
+        status = "unknown"
+        advice = "建议到店确认"
+        if value is not None and value != "":
+            status = "normal"
+            advice = "当前项目正常"
+            if key == "battery_voltage" and float(value) < 12:
+                status = "warning"
+                advice = "电压偏低，建议尽快检查"
+            if key.startswith("tire_") and float(value) < 26:
+                status = "notice"
+                advice = "胎压偏低，建议补压"
+            if key == "coolant_temp_c" and float(value) > 105:
+                status = "warning"
+                advice = "温度偏高，建议尽快处理"
+            if key == "oil_life_percent" and float(value) < 20:
+                status = "notice"
+                advice = "机油寿命偏低，建议安排保养"
+        items.append(
+            {
+                "key": key,
+                "label": label,
+                "value": f"{value}{unit}" if value not in (None, "") and unit else (value if value not in (None, "") else "-"),
+                "status": status,
+                "advice": advice,
+            }
+        )
+    return items
+
+
+def _determine_health_state(items: list[dict[str, Any]]) -> str:
+    statuses = [item.get("status") for item in items]
+    if "warning" in statuses:
+        return "warning"
+    if "notice" in statuses:
+        return "notice"
+    if "normal" in statuses:
+        return "normal"
+    return "unknown"
+
+
+def _build_health_summary(target: dict[str, Any], db: Session, ctx: dict[str, Any]) -> tuple[dict[str, Any], VehicleHealthRecord | None]:
+    latest = (
+        db.query(VehicleHealthRecord)
+        .filter(
+            VehicleHealthRecord.store_id == ctx["store_id"],
+            VehicleHealthRecord.customer_id == str(ctx["partner_id"]),
+            VehicleHealthRecord.vehicle_plate == target["license_plate"],
+        )
+        .order_by(VehicleHealthRecord.measured_at.desc(), VehicleHealthRecord.id.desc())
+        .first()
+    )
+    inspection_items = _build_inspection_items(latest)
+    pending_recommendations = 0
+    if target.get("catalog_model_id"):
+        pending_recommendations = (
+            db.query(VehicleServiceTemplateItem)
+            .filter(
+                VehicleServiceTemplateItem.model_id == target["catalog_model_id"],
+                VehicleServiceTemplateItem.is_active.is_(True),
+            )
+            .count()
+        )
+    flags = [item for item in inspection_items if item["status"] in {"warning", "notice"}][:3]
+    return (
+        {
+            "latest_odometer_km": float(latest.odometer_km) if latest else None,
+            "health_records_count": 1 if latest else 0,
+            "pending_recommendations": int(pending_recommendations),
+            "latest_order_status": "done",
+            "latest_measured_at": latest.measured_at if latest else None,
+            "flags": flags,
+            "inspection_items": inspection_items,
+        },
+        latest,
+    )
+
+
+def _build_recommended_services(model_id: int | None, db: Session) -> list[dict[str, Any]]:
+    if not model_id:
+        return []
+    template_rows = (
+        db.query(VehicleServiceTemplateItem)
+        .filter(
+            VehicleServiceTemplateItem.model_id == model_id,
+            VehicleServiceTemplateItem.is_active.is_(True),
+        )
+        .order_by(VehicleServiceTemplateItem.sort_order.asc(), VehicleServiceTemplateItem.id.asc())
+        .limit(20)
+        .all()
+    )
+    ids = [row.id for row in template_rows]
+    profile_map = {
+        row.template_item_id: row
+        for row in db.query(VehicleServiceTemplateProfile).filter(VehicleServiceTemplateProfile.template_item_id.in_(ids or [-1])).all()
+    }
+    return [
+        {
+            "id": row.id,
+            "service_name": row.part_name,
+            "service_code": row.part_code,
+            "repair_method": row.repair_method,
+            "suggested_price": profile_map.get(row.id).suggested_price if profile_map.get(row.id) else None,
+        }
+        for row in template_rows
+    ]
+
+
+def _build_shop_items(model_id: int | None, db: Session) -> list[dict[str, Any]]:
+    if not model_id:
+        return []
+    items: list[dict[str, Any]] = []
+    package_rows = (
+        db.query(VehicleServicePackage)
+        .filter(VehicleServicePackage.model_id == model_id, VehicleServicePackage.is_active.is_(True))
+        .order_by(VehicleServicePackage.sort_order.asc(), VehicleServicePackage.id.asc())
+        .limit(10)
+        .all()
+    )
+    for row in package_rows:
+        items.append(
+            {
+                "product_type": "package",
+                "id": row.id,
+                "name": row.package_name,
+                "category": "套餐",
+                "description": row.description,
+                "price": row.suggested_price_total,
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {
+                    "recommended_interval_km": row.recommended_interval_km,
+                    "recommended_interval_months": row.recommended_interval_months,
+                },
+            }
+        )
+    service_rows = _build_recommended_services(model_id, db)
+    for row in service_rows:
+        items.append(
+            {
+                "product_type": "service",
+                "id": row["id"],
+                "name": row["service_name"],
+                "category": "服务",
+                "description": row["repair_method"],
+                "price": row["suggested_price"],
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {},
+            }
+        )
+    part_rows = (
+        db.query(PartCatalogItem, PartCatalogProfile)
+        .outerjoin(PartCatalogProfile, PartCatalogProfile.part_id == PartCatalogItem.id)
+        .filter(PartCatalogItem.is_active.is_(True))
+        .limit(20)
+        .all()
+    )
+    for part, profile in part_rows:
+        compatible = part.compatible_model_ids or []
+        if compatible and model_id not in compatible:
+            continue
+        items.append(
+            {
+                "product_type": "part",
+                "id": part.id,
+                "name": part.name,
+                "category": part.category,
+                "description": part.brand,
+                "price": profile.sale_price if profile else None,
+                "stock_qty": profile.stock_qty if profile else None,
+                "is_recommended": True,
+                "compatible_model_ids": compatible or [model_id],
+                "payload": {
+                    "unit": part.unit,
+                    "brand": part.brand,
+                },
+            }
+        )
+    return items
+
+
+@router.get("/cockpit", summary="客户驾驶舱")
+async def customer_cockpit(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    vehicles = _load_customer_vehicles(ctx["partner_id"], db)
+    if not target:
+        return {
+            "selected_vehicle_id": None,
+            "vehicle": None,
+            "vehicles": vehicles,
+            "health_state": "unknown",
+            "health_summary": {"inspection_items": []},
+            "recommended_services": [],
+            "knowledge_docs": [],
+            "shop_items": [],
+        }
+    health_summary, _latest = _build_health_summary(target, db, ctx)
+    knowledge_docs = await customer_vehicle_knowledge_docs(target["id"], "", db, ctx)
+    recommended_services = _build_recommended_services(target.get("catalog_model_id"), db)
+    shop_items = _build_shop_items(target.get("catalog_model_id"), db)[:6]
+    return {
+        "selected_vehicle_id": target["id"],
+        "vehicle": target,
+        "vehicles": vehicles,
+        "health_state": _determine_health_state(health_summary["inspection_items"]),
+        "health_summary": health_summary,
+        "recommended_services": recommended_services,
+        "knowledge_docs": knowledge_docs,
+        "shop_items": shop_items,
+    }
+
+
+@router.get("/shop/products", response_model=CustomerShopProductListResponse, summary="商城商品列表")
+async def customer_shop_products(
+    vehicle_id: int | None = Query(None),
+    kind: str = Query(""),
+    query: str = Query(""),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    items = _build_shop_items(target.get("catalog_model_id") if target else None, db)
+    normalized_kind = normalize_text(kind)
+    normalized_query = normalize_text(query)
+    if normalized_kind:
+        items = [item for item in items if item["product_type"] == normalized_kind]
+    if normalized_query:
+        items = [item for item in items if normalized_query in normalize_text(item["name"]).lower() or normalized_query in normalize_text(item.get("description")).lower()]
+    return {"items": items}
+
+
+@router.get("/shop/recommendations", response_model=CustomerShopProductListResponse, summary="商城推荐")
+async def customer_shop_recommendations(
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    return {"items": _build_shop_items(target.get("catalog_model_id") if target else None, db)[:6]}
+
+
+@router.get("/shop/products/{product_id}", response_model=CustomerShopProductDetailResponse, summary="商品详情")
+async def customer_shop_product_detail(
+    product_id: int,
+    product_type: str = Query("part"),
+    vehicle_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(vehicle_id, db, ctx)
+    items = _build_shop_items(target.get("catalog_model_id") if target else None, db)
+    item = next((row for row in items if row["id"] == product_id and row["product_type"] == normalize_text(product_type)), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="product not found")
+    return {"item": item}
+
+
+@router.post("/appointments/draft", response_model=CustomerAppointmentDraftResponse, summary="创建预约草稿")
+async def customer_create_appointment_draft(
+    payload: CustomerAppointmentDraftCreate,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    target = _resolve_vehicle_for_customer(payload.vehicle_id, db, ctx) if payload.vehicle_id else _resolve_vehicle_for_customer(None, db, ctx)
+    draft = CustomerAppointmentDraft(
+        store_id=ctx["store_id"],
+        partner_id=ctx["partner_id"],
+        vehicle_id=target["id"] if target else payload.vehicle_id,
+        vehicle_plate=target["license_plate"] if target else None,
+        subject=compact_whitespace(payload.subject) or "预约草稿",
+        service_kind=normalize_text(payload.service_kind),
+        source=normalize_text(payload.source) or "mini_program",
+        preferred_date=payload.preferred_date,
+        notes=compact_whitespace(payload.notes),
+        payload=payload.payload or {},
+        status="draft",
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return draft
+
+
+@router.get("/appointments/draft/{draft_id}", response_model=CustomerAppointmentDraftResponse, summary="预约草稿详情")
+async def customer_get_appointment_draft(
+    draft_id: int,
+    db: Session = Depends(get_db),
+    ctx: dict = Depends(_decode_customer_context),
+):
+    draft = (
+        db.query(CustomerAppointmentDraft)
+        .filter(
+            CustomerAppointmentDraft.id == draft_id,
+            CustomerAppointmentDraft.partner_id == ctx["partner_id"],
+            CustomerAppointmentDraft.store_id == ctx["store_id"],
+        )
+        .first()
+    )
+    if not draft:
+        raise HTTPException(status_code=404, detail="draft not found")
+    return draft

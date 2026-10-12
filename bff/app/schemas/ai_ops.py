@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -30,6 +32,8 @@ class AiContextResponse(BaseModel):
     vehicle_catalog_models: list[dict[str, Any]] = Field(default_factory=list)
     work_orders: list[dict[str, Any]] = Field(default_factory=list)
     recommended_services: list[dict[str, Any]] = Field(default_factory=list)
+    service_items: list[dict[str, Any]] = Field(default_factory=list)
+    shop_items: list[dict[str, Any]] = Field(default_factory=list)
     knowledge_docs: list[dict[str, Any]] = Field(default_factory=list)
     parts: list[dict[str, Any]] = Field(default_factory=list)
     write_capabilities: list[str] = Field(default_factory=list)

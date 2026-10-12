@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..core.text import compact_whitespace, normalize_text
 
@@ -21,7 +21,11 @@ UNIT_MAX = 20
 SUPPLIER_MAX = 120
 
 
-class VehicleCatalogModelBase(BaseModel):
+class DrmotoSchemaModel(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class VehicleCatalogModelBase(DrmotoSchemaModel):
     brand: str = Field(..., max_length=CATALOG_BRAND_MAX)
     model_name: str = Field(..., max_length=CATALOG_MODEL_MAX)
     year_from: int
@@ -60,7 +64,7 @@ class VehicleCatalogModelCreate(VehicleCatalogModelBase):
     pass
 
 
-class VehicleCatalogModelUpdate(BaseModel):
+class VehicleCatalogModelUpdate(DrmotoSchemaModel):
     brand: Optional[str] = Field(default=None, max_length=CATALOG_BRAND_MAX)
     model_name: Optional[str] = Field(default=None, max_length=CATALOG_MODEL_MAX)
     year_from: Optional[int] = None
@@ -102,7 +106,7 @@ class VehicleCatalogModelResponse(VehicleCatalogModelBase):
     id: int
 
 
-class VehicleServiceTemplatePartBase(BaseModel):
+class VehicleServiceTemplatePartBase(DrmotoSchemaModel):
     part_id: Optional[int] = None
     part_no: Optional[str] = Field(default=None, max_length=PART_NO_MAX)
     part_name: str = Field(..., max_length=PART_NAME_MAX)
@@ -135,7 +139,7 @@ class VehicleServiceTemplatePartResponse(VehicleServiceTemplatePartBase):
     template_item_id: int
 
 
-class VehicleServiceTemplateItemBase(BaseModel):
+class VehicleServiceTemplateItemBase(DrmotoSchemaModel):
     service_name: str = Field(..., max_length=SERVICE_NAME_MAX)
     service_code: Optional[str] = Field(default=None, max_length=SERVICE_CODE_MAX)
     repair_method: Optional[str] = Field(default=None, max_length=NOTES_MAX)
@@ -174,7 +178,7 @@ class VehicleServiceTemplateItemCreate(VehicleServiceTemplateItemBase):
     pass
 
 
-class VehicleServiceTemplateItemUpdate(BaseModel):
+class VehicleServiceTemplateItemUpdate(DrmotoSchemaModel):
     service_name: Optional[str] = Field(default=None, max_length=SERVICE_NAME_MAX)
     service_code: Optional[str] = Field(default=None, max_length=SERVICE_CODE_MAX)
     repair_method: Optional[str] = Field(default=None, max_length=NOTES_MAX)
@@ -215,9 +219,10 @@ class VehicleServiceTemplateItemUpdate(BaseModel):
 class VehicleServiceTemplateItemResponse(VehicleServiceTemplateItemBase):
     id: int
     model_id: int
+    model_config = ConfigDict(protected_namespaces=())
 
 
-class VehicleServicePackageItemBase(BaseModel):
+class VehicleServicePackageItemBase(DrmotoSchemaModel):
     template_item_id: int
     sort_order: int = 100
     is_optional: bool = False
@@ -239,7 +244,7 @@ class VehicleServicePackageItemResponse(VehicleServicePackageItemBase):
     service_item: Optional[VehicleServiceTemplateItemResponse] = None
 
 
-class VehicleServicePackageBase(BaseModel):
+class VehicleServicePackageBase(DrmotoSchemaModel):
     package_name: str = Field(..., max_length=PACKAGE_NAME_MAX)
     package_code: Optional[str] = Field(default=None, max_length=PACKAGE_CODE_MAX)
     description: Optional[str] = Field(default=None, max_length=NOTES_MAX)
@@ -271,7 +276,7 @@ class VehicleServicePackageCreate(VehicleServicePackageBase):
     pass
 
 
-class VehicleServicePackageUpdate(BaseModel):
+class VehicleServicePackageUpdate(DrmotoSchemaModel):
     package_name: Optional[str] = Field(default=None, max_length=PACKAGE_NAME_MAX)
     package_code: Optional[str] = Field(default=None, max_length=PACKAGE_CODE_MAX)
     description: Optional[str] = Field(default=None, max_length=NOTES_MAX)
@@ -306,9 +311,10 @@ class VehicleServicePackageResponse(VehicleServicePackageBase):
     id: int
     model_id: int
     items: list[VehicleServicePackageItemResponse] = Field(default_factory=list)
+    model_config = ConfigDict(protected_namespaces=())
 
 
-class PartCatalogItemBase(BaseModel):
+class PartCatalogItemBase(DrmotoSchemaModel):
     part_no: str = Field(..., max_length=PART_NO_MAX)
     name: str = Field(..., max_length=PART_NAME_MAX)
     brand: Optional[str] = Field(default=None, max_length=CATALOG_BRAND_MAX)
@@ -349,7 +355,7 @@ class PartCatalogItemCreate(PartCatalogItemBase):
     pass
 
 
-class PartCatalogItemUpdate(BaseModel):
+class PartCatalogItemUpdate(DrmotoSchemaModel):
     part_no: Optional[str] = Field(default=None, max_length=PART_NO_MAX)
     name: Optional[str] = Field(default=None, max_length=PART_NAME_MAX)
     brand: Optional[str] = Field(default=None, max_length=CATALOG_BRAND_MAX)
@@ -391,7 +397,8 @@ class PartCatalogItemUpdate(BaseModel):
 
 class PartCatalogItemResponse(PartCatalogItemBase):
     id: int
+    model_config = ConfigDict(protected_namespaces=())
 
 
-class BatchDeleteRequest(BaseModel):
+class BatchDeleteRequest(DrmotoSchemaModel):
     ids: list[int] = Field(default_factory=list)

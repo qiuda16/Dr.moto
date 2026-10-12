@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from ..core.db import get_db
 from ..core.security import require_roles
 from ..schemas.auth import User
-from ..models import WorkOrder, PaymentLedger, Quote, WorkOrderAdvancedProfile, WorkOrderDeliveryChecklist, VehicleHealthRecord
+from ..models import WorkOrder, PaymentLedger, Quote, WorkOrderAdvancedProfile, WorkOrderDeliveryChecklist, VehicleHealthRecord, WorkOrderOfflinePayment
 from ..core.store import resolve_store_id
 
 router = APIRouter(prefix="/mp/dashboard", tags=["Dashboard"])
@@ -17,6 +17,15 @@ def _utc_day_range():
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     return start, end
+
+
+def _offline_paid_amount(db, store_id, start=None, end=None):
+    query = db.query(func.coalesce(func.sum(WorkOrderOfflinePayment.amount), 0)).filter(
+        WorkOrderOfflinePayment.store_id == store_id, WorkOrderOfflinePayment.status == "paid")
+    if start is not None:
+        query = query.filter(WorkOrderOfflinePayment.received_at >= start,
+                             WorkOrderOfflinePayment.received_at < end)
+    return float(query.scalar() or 0)
 
 
 @router.get("/summary", response_model=dict)
@@ -54,6 +63,7 @@ async def dashboard_summary(
         or 0
     )
 
+    paid_amount_total += _offline_paid_amount(db, store_id)
     active_quotes = (
         db.query(func.count(Quote.id))
         .filter(Quote.store_id == store_id, Quote.is_active == True)
@@ -120,6 +130,7 @@ async def dashboard_overview(
         .scalar()
         or 0
     )
+    paid_amount_total += _offline_paid_amount(db, store_id)
     active_quotes = (
         db.query(func.count(Quote.id))
         .filter(Quote.store_id == store_id, Quote.is_active == True)
@@ -154,6 +165,7 @@ async def dashboard_overview(
         .scalar()
         or 0
     )
+    today_paid_amount += _offline_paid_amount(db, store_id, day_start, day_end)
     overdue_active_count = (
         db.query(func.count(WorkOrder.id))
         .filter(
@@ -264,6 +276,12 @@ async def dashboard_overview(
         .scalar()
         or 0
     )
+    successful_payment_count = db.query(func.count(PaymentLedger.id)).filter(
+        PaymentLedger.store_id == store_id, PaymentLedger.status == "success").scalar() or 0
+    offline_payment_count = db.query(func.count(WorkOrderOfflinePayment.id)).filter(
+        WorkOrderOfflinePayment.store_id == store_id, WorkOrderOfflinePayment.status == "paid").scalar() or 0
+    if offline_payment_count:
+        avg_ticket_amount = paid_amount_total / (successful_payment_count + offline_payment_count)
     status_distribution = (
         db.query(WorkOrder.status, func.count(WorkOrder.id))
         .filter(WorkOrder.store_id == store_id)
@@ -317,6 +335,18 @@ async def dashboard_overview(
         "provider": row.provider,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     } for row in recent_payments_rows]
+    offline_rows = db.query(WorkOrderOfflinePayment).filter(
+        WorkOrderOfflinePayment.store_id == store_id,
+        WorkOrderOfflinePayment.status == "paid",
+    ).order_by(WorkOrderOfflinePayment.received_at.desc()).limit(10).all()
+    recent_payments.extend({
+        "transaction_id": f"offline-{row.id}", "work_order_id": row.work_order_uuid,
+        "amount": float(row.amount), "status": "success", "provider": "offline",
+        "payment_method": row.payment_method,
+        "created_at": row.received_at.isoformat() if row.received_at else None,
+    } for row in offline_rows)
+    recent_payments.sort(key=lambda row: row["created_at"] or "", reverse=True)
+    recent_payments = recent_payments[:10]
 
     recent_quotes_rows = (
         db.query(Quote)

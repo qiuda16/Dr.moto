@@ -81,3 +81,12 @@ textarea {
 .el-tag {
   border-radius: 999px;
 }
+
+/* Hide Element Plus word-limit counters across the staff backend.
+   The labels already communicate required/optional status, so the live
+   character counters add noise in dense operational forms. */
+.el-input__count,
+.el-textarea__count,
+.el-input__count-inner {
+  display: none !important;
+}

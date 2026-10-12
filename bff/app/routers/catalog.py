@@ -1,11 +1,13 @@
 ﻿
+from __future__ import annotations
+
 import re
 from datetime import datetime
 from difflib import SequenceMatcher
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -61,6 +63,7 @@ class VehicleCatalogSpecPayload(BaseModel):
     source_page: str | None = None
     source_text: str | None = None
     review_status: str | None = "confirmed"
+    model_config = ConfigDict(protected_namespaces=())
 
 
 def _normalize_search_text(value: str | None) -> str:
@@ -153,6 +156,7 @@ def _rank_part(row: PartCatalogItem, query: str) -> tuple[float, str, str]:
 class VehicleCatalogSpecResponse(VehicleCatalogSpecPayload):
     id: int
     model_id: int
+    model_config = ConfigDict(protected_namespaces=())
 
 MOTO58_BASE = "https://m.58moto.com/clientApi"
 MOTO58_PLATFORM = 11

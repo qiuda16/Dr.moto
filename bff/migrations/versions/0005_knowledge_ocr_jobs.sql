@@ -1,3 +1,18 @@
+CREATE TABLE IF NOT EXISTS vehicle_knowledge_documents (
+    id BIGSERIAL PRIMARY KEY,
+    model_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_url TEXT NOT NULL,
+    file_type VARCHAR(255),
+    category VARCHAR(255),
+    notes TEXT,
+    uploaded_by VARCHAR(128),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_knowledge_documents_model_id
+    ON vehicle_knowledge_documents (model_id);
+
 ALTER TABLE vehicle_knowledge_documents
     ADD COLUMN IF NOT EXISTS object_name VARCHAR(512);
 

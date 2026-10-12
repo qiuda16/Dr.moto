@@ -30,6 +30,19 @@
           <span>{{ customerDomainText }}</span>
     </div>
 
+    <el-alert
+      v-if="pageError"
+      :title="pageError"
+      type="error"
+      show-icon
+      :closable="false"
+      class="page-alert"
+    >
+      <template #default>
+        <el-button text type="primary" @click="loadCustomers">重新加载客户库</el-button>
+      </template>
+    </el-alert>
+
     <div class="card toolbar-card">
       <div class="toolbar">
         <el-input
@@ -61,6 +74,8 @@
         ref="customerTableRef"
         :data="customers"
         v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.customers"
         row-key="id"
         @selection-change="onCustomerSelectionChange"
         @row-dblclick="onCustomerRowDblClick"
@@ -102,10 +117,10 @@
       </el-table>
     </div>
 
-    <el-dialog v-model="createDialogVisible" title="新建客户（含车辆）" width="860px">
-      <el-form :model="createForm" label-width="90px">
+    <el-dialog v-model="createDialogVisible" class="customer-create-dialog" title="新建客户（含车辆）" width="860px">
+      <el-form ref="createFormRef" :model="createForm" :rules="createFormRules" label-width="90px">
         <el-row :gutter="12">
-          <el-col :span="8"><el-form-item label="姓名"><el-input v-model="createForm.name" maxlength="80" show-word-limit /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item prop="name" :label="requiredLabel('姓名')"><el-input v-model="createForm.name" maxlength="80" show-word-limit /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="手机号"><el-input v-model="createForm.phone" maxlength="40" show-word-limit /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="邮箱"><el-input v-model="createForm.email" maxlength="120" show-word-limit /></el-form-item></el-col>
         </el-row>
@@ -118,16 +133,16 @@
           </div>
 
           <el-row :gutter="12">
-            <el-col :span="8"><el-form-item label="车牌"><el-input v-model="vehicle.license_plate" maxlength="30" show-word-limit placeholder="例如：沪A12345" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :prop="`vehicles.${index}.license_plate`" :label="requiredLabel('车牌')"><el-input v-model="vehicle.license_plate" maxlength="30" show-word-limit placeholder="例如：沪A12345" /></el-form-item></el-col>
             <el-col :span="8">
-              <el-form-item label="品牌">
+              <el-form-item :prop="`vehicles.${index}.make`" :label="requiredLabel('品牌')">
                 <el-select v-model="vehicle.make" filterable allow-create default-first-option style="width: 100%;" @change="onVehicleBrandChange(vehicle)">
                   <el-option v-for="item in vehicleBrandOptions" :key="item" :label="item" :value="item" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="车型">
+              <el-form-item :prop="`vehicles.${index}.model`" :label="requiredLabel('车型')">
                 <div class="model-editor">
                   <el-select v-model="vehicle.catalog_model_id" filterable clearable style="width: 100%;" @change="(id) => onVehicleModelSelect(vehicle, id)">
                     <el-option
@@ -144,7 +159,7 @@
           </el-row>
 
           <el-row :gutter="12">
-            <el-col :span="8"><el-form-item label="年份"><el-input-number v-model="vehicle.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :prop="`vehicles.${index}.year`" :label="requiredLabel('年份')"><el-input-number v-model="vehicle.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="发动机号"><el-input v-model="vehicle.engine_code" maxlength="80" show-word-limit /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="VIN"><el-input v-model="vehicle.vin" maxlength="64" show-word-limit /></el-form-item></el-col>
           </el-row>
@@ -162,12 +177,12 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="addVehicleDialogVisible" title="为客户新增车辆" width="680px">
-      <el-form :model="addVehicleForm" label-width="100px">
+    <el-dialog v-model="addVehicleDialogVisible" class="customer-add-vehicle-dialog" title="为客户新增车辆" width="680px">
+      <el-form ref="addVehicleFormRef" :model="addVehicleForm" :rules="addVehicleRules" label-width="100px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="车牌"><el-input v-model="addVehicleForm.license_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="license_plate" :label="requiredLabel('车牌')"><el-input v-model="addVehicleForm.license_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
           <el-col :span="12">
-            <el-form-item label="品牌">
+            <el-form-item prop="make" :label="requiredLabel('品牌')">
               <el-select v-model="addVehicleForm.make" filterable allow-create default-first-option style="width: 100%;" @change="onVehicleBrandChange(addVehicleForm)">
                 <el-option v-for="item in vehicleBrandOptions" :key="item" :label="item" :value="item" />
               </el-select>
@@ -177,7 +192,7 @@
 
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="车型">
+            <el-form-item prop="model" :label="requiredLabel('车型')">
               <div class="model-editor">
                 <el-select v-model="addVehicleForm.catalog_model_id" filterable clearable style="width: 100%;" @change="(id) => onVehicleModelSelect(addVehicleForm, id)">
                   <el-option
@@ -188,10 +203,10 @@
                   />
                 </el-select>
                 <el-input v-model="addVehicleForm.model" maxlength="120" show-word-limit placeholder="库里没有时可手动填写" />
-              </div>
-            </el-form-item>
+                </div>
+              </el-form-item>
           </el-col>
-          <el-col :span="12"><el-form-item label="年份"><el-input-number v-model="addVehicleForm.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="year" :label="requiredLabel('年份')"><el-input-number v-model="addVehicleForm.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
         </el-row>
 
         <el-row :gutter="12">
@@ -359,7 +374,13 @@
                 <span>体检时间线（{{ selectedVehiclePlate || '未选择车辆' }}）</span>
               </div>
 
-              <el-table :data="healthRecords" v-loading="healthLoading" style="width: 100%">
+              <el-table
+                :data="healthRecords"
+                v-loading="healthLoading"
+                :element-loading-text="TABLE_LOADING_TEXT"
+                :empty-text="EMPTY_TEXT.healthRecords"
+                style="width: 100%"
+              >
                 <el-table-column prop="measured_at" label="体检时间" width="180" />
                 <el-table-column prop="odometer_km" label="里程(km)" width="110" />
                 <el-table-column prop="odometer_delta_from_prev" label="较上次变化" width="120">
@@ -383,7 +404,7 @@
                 <span>历史工单（{{ selectedVehiclePlate || '全部车辆' }}）</span>
               </div>
 
-              <el-table :data="selectedVehicleOrders" style="width: 100%" @row-dblclick="openOrderFromProfile">
+              <el-table :data="selectedVehicleOrders" :empty-text="EMPTY_TEXT.customerOrders" style="width: 100%" @row-dblclick="openOrderFromProfile">
                 <el-table-column prop="name" label="工单号" min-width="160" />
                 <el-table-column prop="vehicle_plate" label="车牌" width="110" />
                 <el-table-column prop="state" label="状态" width="110" />
@@ -410,7 +431,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="里程(km)">
+            <el-form-item :label="requiredLabel('里程(km)')">
               <el-input-number v-model="healthForm.odometer_km" :min="0" :precision="1" controls-position="right" style="width: 100%;" />
             </el-form-item>
           </el-col>
@@ -583,7 +604,7 @@
 
     <el-dialog v-model="editCustomerDialogVisible" title="编辑客户" width="560px">
       <el-form :model="editCustomerForm" label-width="90px">
-        <el-form-item label="姓名"><el-input v-model="editCustomerForm.name" maxlength="80" show-word-limit /></el-form-item>
+        <el-form-item :label="requiredLabel('姓名')"><el-input v-model="editCustomerForm.name" maxlength="80" show-word-limit /></el-form-item>
         <el-form-item label="手机号"><el-input v-model="editCustomerForm.phone" maxlength="40" show-word-limit /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="editCustomerForm.email" maxlength="120" show-word-limit /></el-form-item>
       </el-form>
@@ -596,19 +617,19 @@
     <el-dialog v-model="editVehicleDialogVisible" title="编辑车辆" width="720px">
       <el-form :model="editVehicleForm" label-width="120px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="车牌"><el-input v-model="editVehicleForm.license_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item :label="requiredLabel('车牌')"><el-input v-model="editVehicleForm.license_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="VIN"><el-input v-model="editVehicleForm.vin" maxlength="64" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="品牌">
+            <el-form-item :label="requiredLabel('品牌')">
               <el-select v-model="editVehicleForm.make" filterable allow-create default-first-option style="width: 100%;" @change="onVehicleBrandChange(editVehicleForm)">
                 <el-option v-for="item in vehicleBrandOptions" :key="item" :label="item" :value="item" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="车型">
+            <el-form-item :label="requiredLabel('车型')">
               <div class="model-editor">
                 <el-select v-model="editVehicleForm.catalog_model_id" filterable clearable style="width: 100%;" @change="(id) => onVehicleModelSelect(editVehicleForm, id)">
                   <el-option
@@ -624,7 +645,7 @@
           </el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="年份"><el-input-number v-model="editVehicleForm.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item :label="requiredLabel('年份')"><el-input-number v-model="editVehicleForm.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="发动机号"><el-input v-model="editVehicleForm.engine_code" maxlength="80" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-form-item label="颜色"><el-input v-model="editVehicleForm.color" maxlength="40" show-word-limit /></el-form-item>
@@ -642,8 +663,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
+import { getAuthToken } from '../utils/auth'
 import Sortable from 'sortablejs'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
+import { requiredLabel } from '../utils/labels'
 
 const route = useRoute()
 const router = useRouter()
@@ -661,6 +686,8 @@ let customerSortable = null
 
 const createDialogVisible = ref(false)
 const addVehicleDialogVisible = ref(false)
+const createFormRef = ref(null)
+const addVehicleFormRef = ref(null)
 const editCustomerDialogVisible = ref(false)
 const editVehicleDialogVisible = ref(false)
 const profileVisible = ref(false)
@@ -686,6 +713,7 @@ const savingVehicleEdit = ref(false)
 const vehicleBrandOptions = ref([])
 const vehicleModelOptionsByBrand = ref({})
 const appSettings = reactive(createAppSettingsState())
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 
 const totalVehicleCount = computed(() => customers.value.reduce((sum, item) => sum + Number(item.vehicle_count || (item.vehicles || []).length || 0), 0))
 const customersWithVehicles = computed(() => customers.value.filter((item) => Number(item.vehicle_count || (item.vehicles || []).length || 0) > 0).length)
@@ -793,6 +821,25 @@ const createForm = reactive({
 })
 
 const addVehicleForm = reactive(makeEmptyVehicle())
+const requiredRule = (message) => ({ required: true, message, trigger: ['blur', 'change'] })
+const createFormRules = computed(() => {
+  const rules = {
+    name: [requiredRule('请填写客户姓名')]
+  }
+  createForm.vehicles.forEach((_, index) => {
+    rules[`vehicles.${index}.license_plate`] = [requiredRule('请填写车牌')]
+    rules[`vehicles.${index}.make`] = [requiredRule('请选择品牌')]
+    rules[`vehicles.${index}.model`] = [requiredRule('请填写车型')]
+    rules[`vehicles.${index}.year`] = [requiredRule('请填写年份')]
+  })
+  return rules
+})
+const addVehicleRules = computed(() => ({
+  license_plate: [requiredRule('请填写车牌')],
+  make: [requiredRule('请选择品牌')],
+  model: [requiredRule('请填写车型')],
+  year: [requiredRule('请填写年份')]
+}))
 const editCustomerForm = reactive({ id: null, name: '', phone: '', email: '' })
 const editVehicleForm = reactive({
   id: null,
@@ -895,6 +942,7 @@ const getVehicleModelOptions = (brand) => {
 }
 
 const loadAppSettings = async () => {
+  if (!getAuthToken()) return
   try {
     const data = await request.get('/mp/settings')
     applyAppSettings(appSettings, data)
@@ -978,6 +1026,7 @@ const loadCustomers = async () => {
     const res = await request.get('/mp/workorders/customers/with-vehicles', {
       params: { query: query.value || '', limit: 50 }
     })
+    clearPageError()
     customers.value = applyCustomerPresentation(res || [])
     if (pendingHealthJump.value?.customerId) {
       const jump = pendingHealthJump.value
@@ -1000,6 +1049,9 @@ const loadCustomers = async () => {
     }
     await nextTick()
     initCustomerSortable()
+  } catch (error) {
+    setPageError('加载客户库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载客户库失败')
   } finally {
     loading.value = false
   }
@@ -1030,7 +1082,8 @@ const removeVehicle = (index) => {
 const validateVehicle = (vehicle) => vehicle.license_plate && vehicle.make && vehicle.model && vehicle.year
 
 const submitCreateCustomer = async () => {
-  if (!createForm.name) return ElMessage.warning('请先填写客户姓名')
+  const valid = await createFormRef.value?.validate().catch(() => false)
+  if (!valid) return
   const validVehicles = createForm.vehicles.filter(validateVehicle)
   if (!validVehicles.length) return ElMessage.warning('请至少填写一辆完整车辆信息')
   saving.value = true
@@ -1059,7 +1112,8 @@ const openAddVehicleDialog = (customer) => {
 
 const submitAddVehicle = async () => {
   if (!targetCustomerId.value) return
-  if (!validateVehicle(addVehicleForm)) return ElMessage.warning('请填写完整车辆信息')
+  const valid = await addVehicleFormRef.value?.validate().catch(() => false)
+  if (!valid) return
   savingVehicle.value = true
   try {
     await request.post(`/mp/workorders/customers/${targetCustomerId.value}/vehicles`, addVehicleForm)
@@ -1444,6 +1498,26 @@ const openProfile = async (customer) => {
 .latest-health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; color: #334155; }
 .empty-inline { color: #7a8599; font-size: 13px; }
 .empty-panel { padding: 18px; border: 1px dashed #d9e2f2; border-radius: 12px; color: #7a8599; background: #fbfcff; }
+
+.customer-create-dialog :deep(.el-dialog),
+.customer-add-vehicle-dialog :deep(.el-dialog) {
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.customer-create-dialog :deep(.el-dialog__body),
+.customer-add-vehicle-dialog :deep(.el-dialog__body) {
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  padding-right: 20px;
+}
+
+.customer-create-dialog :deep(.el-dialog__footer),
+.customer-add-vehicle-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0;
+}
+
 @media (max-width: 960px) {
   .profile-layout { grid-template-columns: 1fr; }
   .profile-focus-grid, .vehicle-summary-grid, .vehicle-info-grid, .profile-kpi, .overview-kpis { grid-template-columns: repeat(2, minmax(120px, 1fr)); }

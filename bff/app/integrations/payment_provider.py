@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 import hmac
 import hashlib
@@ -12,7 +14,7 @@ class PaymentIntentResult:
     status: str
 
 
-SUPPORTED_PROVIDERS = {"mock", "wechat"}
+SUPPORTED_PROVIDERS = {"mock", "wechat", "offline"}
 
 
 def build_payment_intent(
@@ -35,6 +37,9 @@ def build_payment_intent(
             payment_url=f"{base_url}/mp/payments/mock_gateway?id={transaction_id}&amount={amount}&store_id={store_id}",
             status="pending",
         )
+
+    if normalized == "offline":
+        raise RuntimeError("Offline payment does not create a payment intent; record the receipt from the staff work order flow")
 
     prepay = wechat_pay_client.create_native_prepay(
         out_trade_no=transaction_id,

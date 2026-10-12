@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from difflib import SequenceMatcher
 import logging
 import requests
@@ -43,6 +45,32 @@ KNOWLEDGE_NOTES_MAX = 2000
 
 def _catalog_vehicle_key(model_id: int) -> str:
     return f"CATALOG_MODEL:{model_id}"
+
+
+def _ensure_catalog_vehicle_stub(db: Session, model: VehicleCatalogModel) -> Vehicle:
+    vehicle_key = _catalog_vehicle_key(model.id)
+    row = db.query(Vehicle).filter(Vehicle.key == vehicle_key).first()
+    if row:
+        return row
+
+    engine_code = model.default_engine_code
+    if not engine_code and model.displacement_cc:
+        try:
+            engine_code = f"{int(model.displacement_cc)}cc"
+        except Exception:
+            engine_code = str(model.displacement_cc)
+
+    row = Vehicle(
+        key=vehicle_key,
+        make=model.brand or "UNKNOWN",
+        model=model.model_name or f"Catalog Model {model.id}",
+        year_from=int(model.year_from or datetime.now(timezone.utc).year),
+        year_to=model.year_to,
+        engine_code=engine_code,
+    )
+    db.add(row)
+    db.flush()
+    return row
 
 
 def _validate_bounded_text(value: Optional[str], field_name: str, max_length: int, default: Optional[str] = None) -> Optional[str]:
@@ -110,35 +138,39 @@ def _document_search_rank(
     created_weight = int((row.id if row else payload.get("id")) or 0)
     return (score, created_weight, _normalize_match_text(row.title if row else payload.get("title")))
 
-class VehicleSchema(BaseModel):
+class KnowledgeBaseModel(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class VehicleSchema(KnowledgeBaseModel):
     key: str
     make: str
     model: str
     year_from: int
     
-class StepSchema(BaseModel):
+class StepSchema(KnowledgeBaseModel):
     step_order: int
     instruction: str
     required_tools: Optional[str]
     torque_spec: Optional[str]
 
-class ProcedureSchema(BaseModel):
+class ProcedureSchema(KnowledgeBaseModel):
     id: int
     name: str
     steps: List[StepSchema]
 
 
-class ManualProcedureCreate(BaseModel):
+class ManualProcedureCreate(KnowledgeBaseModel):
     name: str
     description: Optional[str] = None
 
 
-class ManualProcedureUpdate(BaseModel):
+class ManualProcedureUpdate(KnowledgeBaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
 
-class ManualStepCreate(BaseModel):
+class ManualStepCreate(KnowledgeBaseModel):
     step_order: int
     instruction: str
     required_tools: Optional[str] = None
@@ -146,7 +178,7 @@ class ManualStepCreate(BaseModel):
     hazards: Optional[str] = None
 
 
-class ManualStepUpdate(BaseModel):
+class ManualStepUpdate(KnowledgeBaseModel):
     step_order: Optional[int] = None
     instruction: Optional[str] = None
     required_tools: Optional[str] = None
@@ -154,7 +186,7 @@ class ManualStepUpdate(BaseModel):
     hazards: Optional[str] = None
 
 
-class KnowledgeDocumentResponse(BaseModel):
+class KnowledgeDocumentResponse(KnowledgeBaseModel):
     id: int
     model_id: int
     title: str
@@ -180,12 +212,12 @@ class KnowledgeDocumentResponse(BaseModel):
     latest_parse_job: Optional[dict] = None
 
 
-class KnowledgeDocumentReviewUpdate(BaseModel):
+class KnowledgeDocumentReviewUpdate(KnowledgeBaseModel):
     review_status: str
     review_notes: Optional[str] = None
 
 
-class KnowledgeDocumentCatalogConfirmationUpdate(BaseModel):
+class KnowledgeDocumentCatalogConfirmationUpdate(KnowledgeBaseModel):
     action: str
     model_id: Optional[int] = None
     brand: Optional[str] = None
@@ -198,7 +230,7 @@ class KnowledgeDocumentCatalogConfirmationUpdate(BaseModel):
     notes: Optional[str] = None
 
 
-class KnowledgeParseJobResponse(BaseModel):
+class KnowledgeParseJobResponse(KnowledgeBaseModel):
     id: int
     document_id: int
     model_id: int
@@ -220,7 +252,7 @@ class KnowledgeParseJobResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
 
-class KnowledgeParsePageResponse(BaseModel):
+class KnowledgeParsePageResponse(KnowledgeBaseModel):
     id: int
     job_id: int
     document_id: int
@@ -238,7 +270,7 @@ class KnowledgeParseJobDetailResponse(KnowledgeParseJobResponse):
     pages: List[KnowledgeParsePageResponse] = []
 
 
-class KnowledgeParseJobResultUpdate(BaseModel):
+class KnowledgeParseJobResultUpdate(KnowledgeBaseModel):
     applicability: Optional[dict] = None
     sections: Optional[list] = None
     specs: Optional[list] = None
@@ -246,14 +278,14 @@ class KnowledgeParseJobResultUpdate(BaseModel):
     review_notes: Optional[str] = None
 
 
-class KnowledgeParsePageUpdate(BaseModel):
+class KnowledgeParsePageUpdate(KnowledgeBaseModel):
     summary: Optional[str] = None
     text_content: Optional[str] = None
     specs_json: Optional[list] = None
     procedures_json: Optional[list] = None
 
 
-class KnowledgeSegmentResponse(BaseModel):
+class KnowledgeSegmentResponse(KnowledgeBaseModel):
     id: int
     model_id: int
     source_document_id: int
@@ -1483,6 +1515,10 @@ async def create_catalog_model_manual(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "manager"]))
 ):
+    model = db.query(VehicleCatalogModel).filter(VehicleCatalogModel.id == model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="标准车型不存在")
+    _ensure_catalog_vehicle_stub(db, model)
     row = Procedure(
         vehicle_key=_catalog_vehicle_key(model_id),
         name=payload.name,
@@ -2287,6 +2323,8 @@ async def bind_parse_job_to_catalog_model(
         _ensure_baseline_service_items_for_model(db, target_model.id)
         created = True
 
+    _ensure_catalog_vehicle_stub(db, target_model)
+
     document.catalog_candidate_json = candidate or None
     _set_document_catalog_confirmation(document, target_model, current_user)
     _rebind_document_related_records(db, document, target_model.id)
@@ -2454,6 +2492,10 @@ async def materialize_parse_job_segments(
         .order_by(VehicleKnowledgeParsePage.page_number.asc(), VehicleKnowledgeParsePage.id.asc())
         .all()
     )
+    model = db.query(VehicleCatalogModel).filter(VehicleCatalogModel.id == source_document.model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="标准车型不存在")
+    _ensure_catalog_vehicle_stub(db, model)
     vehicle_key = _catalog_vehicle_key(source_document.model_id)
     materialized = []
     for segment in toc_segments:

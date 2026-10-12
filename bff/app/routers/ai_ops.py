@@ -1,13 +1,22 @@
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import re
+import time
 import uuid
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy import or_
+from sqlalchemy import MetaData, Table, create_engine, delete, insert, inspect, or_, select, update
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
 from ..core.audit import log_audit
@@ -17,12 +26,15 @@ from ..core.store import resolve_store_id
 from ..core.text import compact_whitespace, normalize_text
 from ..integrations.odoo import odoo_client
 from ..models import (
+    AuditLog,
     PartCatalogItem,
     PartCatalogProfile,
     Quote,
     VehicleCatalogModel,
     VehicleHealthRecord,
     VehicleKnowledgeDocument,
+    VehicleServicePackage,
+    VehicleServicePackageItem,
     VehicleServiceTemplateItem,
     VehicleServiceTemplatePart,
     VehicleServiceTemplateProfile,
@@ -71,6 +83,13 @@ ALLOWED_WRITE_ACTIONS = [
     "create_quote_draft",
     "create_part",
     "update_part",
+    "database_schema",
+    "database_select",
+    "database_insert",
+    "database_update",
+    "database_delete_plan",
+    "database_delete_confirm",
+    "database_undo",
 ]
 
 
@@ -84,6 +103,8 @@ def _infer_query_domains(
     work_orders: list[dict[str, Any]],
     vehicle_catalog_models: list[dict[str, Any]],
     parts: list[dict[str, Any]],
+    service_items: list[dict[str, Any]],
+    shop_items: list[dict[str, Any]],
     knowledge_docs: list[dict[str, Any]],
 ) -> list[str]:
     text = normalize_text(query) or ""
@@ -104,6 +125,16 @@ def _infer_query_domains(
         add("catalog")
     if parts:
         add("parts_inventory")
+    if service_items:
+        add("service_items")
+    if shop_items:
+        add("shop")
+    if "商城" in text or "shop" in text or "商品" in text or "套餐" in text or "上架" in text:
+        add("shop")
+    if query:
+        service_keywords = ["标准项目", "服务模板", "维修方法", "维修步骤", "工时", "工时费", "建议售价", "保养项目", "维修"]
+        if any(keyword in text for keyword in service_keywords):
+            add("service_items")
     if knowledge_docs:
         add("knowledge")
 
@@ -113,6 +144,8 @@ def _infer_query_domains(
         "work_order": ["工单", "施工", "交付", "状态", "报价", "order", "quote"],
         "catalog": ["车型", "品牌", "目录", "catalog", "bmw", "奔驰", "宝马", "奥迪", "丰田", "本田", "x1", "x3", "x5", "3系", "5系", "7系"],
         "parts_inventory": ["配件", "库存", "part", "inventory", "产品", "材料"],
+        "service_items": ["标准项目", "服务模板", "维修方法", "维修步骤", "工时", "工时费", "建议售价", "保养项目"],
+        "shop": ["商城", "商品", "套餐", "上架", "下架", "预览", "价格", "shop"],
         "knowledge": ["怎么修", "维修", "步骤", "手册", "知识", "procedure", "manual", "spec", "保养", "更换", "机油", "滤芯", "火花塞", "刹车片"],
         "store_ops": ["待交付", "待施工", "ready", "quoted", "in progress", "看板", "总览", "门店"],
         "project_system": ["项目", "系统", "模块", "数据库", "架构", "前端", "后端", "odoo", "bff", "ai"],
@@ -129,12 +162,18 @@ def _choose_primary_domain(domains: list[str], query: str | None = None) -> str:
     text = text.lower()
     if "project_system" in domains and any(keyword in text for keyword in ["项目", "模块", "架构", "数据库", "前端", "后端", "odoo", "bff", "ai"]):
         return "project_system"
+    if "service_items" in domains and any(keyword in text for keyword in ["标准项目", "服务模板", "维修方法", "维修步骤", "工时", "工时费", "建议售价", "保养项目", "更换", "怎么修", "怎么换"]):
+        return "service_items"
+    if "shop" in domains and any(keyword in text for keyword in ["商城", "商品", "套餐", "上架", "下架", "预览", "价格", "shop"]):
+        return "shop"
     if "knowledge" in domains and any(keyword in text for keyword in ["怎么修", "维修", "手册", "步骤", "保养", "更换", "机油", "滤芯", "火花塞", "刹车片"]):
         return "knowledge"
     if "catalog" in domains and any(keyword in text for keyword in ["车型", "品牌", "目录", "宝马", "奔驰", "奥迪", "bmw", "audi", "benz"]):
         return "catalog"
     priority = [
+        "service_items",
         "catalog",
+        "shop",
         "work_order",
         "customer",
         "vehicle",
@@ -169,6 +208,10 @@ def _source_hints_for_domains(domains: list[str]) -> list[str]:
             add("odoo.work_order")
         elif domain == "catalog":
             add("bff.vehicle_catalog")
+        elif domain == "service_items":
+            add("bff.service_items")
+        elif domain == "shop":
+            add("bff.shop")
         elif domain == "parts_inventory":
             add("bff.parts")
             add("odoo.inventory")
@@ -199,6 +242,10 @@ def _retrieval_plan_for_domains(domains: list[str]) -> list[str]:
             add("先查工单详情，再查流程记录、报价和交付检查表")
         elif domain == "catalog":
             add("先查标准车型目录，再看规格、服务模板和文档")
+        elif domain == "service_items":
+            add("先查标准项目和维修方法，再看工时、建议售价与所需配件")
+        elif domain == "shop":
+            add("先查商城商品，再看套餐、服务、配件和适用车型")
         elif domain == "parts_inventory":
             add("先查配件目录；如果涉及实时库存，以 Odoo 库存为准")
         elif domain == "knowledge":
@@ -437,18 +484,31 @@ def _search_work_orders(
 
 
 def _recommend_services(db: Session, model_id: int | None, limit: int = 8) -> list[dict[str, Any]]:
-    if not model_id:
-        return []
-    rows = (
-        db.query(VehicleServiceTemplateItem)
-        .filter(
-            VehicleServiceTemplateItem.model_id == model_id,
-            VehicleServiceTemplateItem.is_active.is_(True),
-        )
-        .order_by(VehicleServiceTemplateItem.sort_order.asc(), VehicleServiceTemplateItem.id.asc())
-        .limit(limit)
-        .all()
-    )
+    return _service_items(db, model_id=model_id, query=None, limit=limit)
+
+
+def _service_items(db: Session, model_id: int | None, query: str | None, limit: int = 12) -> list[dict[str, Any]]:
+    normalized_query = compact_whitespace(query or "")
+    q = db.query(VehicleServiceTemplateItem).filter(VehicleServiceTemplateItem.is_active.is_(True))
+    if model_id:
+        q = q.filter(VehicleServiceTemplateItem.model_id == model_id)
+    rows = q.order_by(VehicleServiceTemplateItem.sort_order.asc(), VehicleServiceTemplateItem.id.asc()).all()
+    if normalized_query:
+        lowered = normalized_query.lower()
+        filtered_rows = []
+        for row in rows:
+            haystack = " ".join(
+                [
+                    compact_whitespace(str(row.part_name or "")).lower(),
+                    compact_whitespace(str(row.part_code or "")).lower(),
+                    compact_whitespace(str(row.repair_method or "")).lower(),
+                    compact_whitespace(str(row.notes or "")).lower(),
+                ]
+            )
+            if lowered in haystack or any(token and token in haystack for token in lowered.split()):
+                filtered_rows.append(row)
+        rows = filtered_rows
+    rows = rows[:limit]
     ids = [row.id for row in rows]
     profile_map = {
         row.template_item_id: row
@@ -479,9 +539,11 @@ def _recommend_services(db: Session, model_id: int | None, limit: int = 8) -> li
         result.append(
             {
                 "template_item_id": row.id,
+                "model_id": row.model_id,
                 "service_code": row.part_code,
                 "service_name": row.part_name,
                 "repair_method": row.repair_method,
+                "notes": row.notes,
                 "labor_hours": row.labor_hours,
                 "labor_price": profile.labor_price if profile else None,
                 "suggested_price": profile.suggested_price if profile else None,
@@ -537,6 +599,131 @@ def _search_parts(db: Session, query: str, limit: int = 8) -> list[dict[str, Any
         for row in db.query(PartCatalogProfile).filter(PartCatalogProfile.part_id.in_([item.id for item in rows] or [-1])).all()
     }
     return [_part_to_response(row, profile_map.get(row.id)) for row in rows]
+
+
+def _search_service_items(db: Session, model_id: int | None, query: str, limit: int = 12) -> list[dict[str, Any]]:
+    normalized_query = compact_whitespace(query)
+    if not normalized_query and not model_id:
+        return []
+    return _service_items(db, model_id=model_id, query=normalized_query or None, limit=limit)
+
+
+def _shop_items(db: Session, model_id: int | None, query: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+    if not model_id:
+        return []
+    normalized_query = compact_whitespace(query or "")
+    items: list[dict[str, Any]] = []
+
+    package_rows = (
+        db.query(VehicleServicePackage)
+        .filter(VehicleServicePackage.model_id == model_id, VehicleServicePackage.is_active.is_(True))
+        .order_by(VehicleServicePackage.sort_order.asc(), VehicleServicePackage.id.asc())
+        .all()
+    )
+    package_ids = [row.id for row in package_rows]
+    package_item_rows = (
+        db.query(VehicleServicePackageItem)
+        .filter(VehicleServicePackageItem.package_id.in_(package_ids or [-1]))
+        .order_by(VehicleServicePackageItem.sort_order.asc(), VehicleServicePackageItem.id.asc())
+        .all()
+    )
+    package_item_map: dict[int, list[int]] = {}
+    for row in package_item_rows:
+        package_item_map.setdefault(row.package_id, []).append(row.template_item_id)
+
+    service_rows = _service_items(db, model_id=model_id, query=None, limit=50)
+    service_rows_by_id = {int(item.get("template_item_id") or item.get("id") or -1): item for item in service_rows}
+
+    for row in package_rows:
+        package_services = [
+            service_rows_by_id.get(template_id)
+            for template_id in package_item_map.get(row.id, [])
+        ]
+        package_services = [item for item in package_services if isinstance(item, dict)]
+        items.append(
+            {
+                "product_type": "package",
+                "id": row.id,
+                "name": row.package_name,
+                "category": "套餐",
+                "description": row.description,
+                "price": row.suggested_price_total,
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {
+                    "recommended_interval_km": row.recommended_interval_km,
+                    "recommended_interval_months": row.recommended_interval_months,
+                    "labor_hours_total": row.labor_hours_total,
+                    "labor_price_total": row.labor_price_total,
+                    "parts_price_total": row.parts_price_total,
+                    "services": [item.get("service_name") for item in package_services if item.get("service_name")],
+                },
+            }
+        )
+
+    for row in service_rows:
+        items.append(
+            {
+                "product_type": "service",
+                "id": row["template_item_id"],
+                "name": row["service_name"],
+                "category": "服务",
+                "description": row.get("repair_method"),
+                "price": row.get("suggested_price"),
+                "stock_qty": None,
+                "is_recommended": True,
+                "compatible_model_ids": [model_id],
+                "payload": {},
+            }
+        )
+
+    part_rows = (
+        db.query(PartCatalogItem, PartCatalogProfile)
+        .outerjoin(PartCatalogProfile, PartCatalogProfile.part_id == PartCatalogItem.id)
+        .filter(PartCatalogItem.is_active.is_(True))
+        .limit(40)
+        .all()
+    )
+    for part, profile in part_rows:
+        compatible = part.compatible_model_ids or []
+        if compatible and model_id not in compatible:
+            continue
+        items.append(
+            {
+                "product_type": "part",
+                "id": part.id,
+                "name": part.name,
+                "category": part.category,
+                "description": part.brand,
+                "price": profile.sale_price if profile else None,
+                "stock_qty": profile.stock_qty if profile else None,
+                "is_recommended": True,
+                "compatible_model_ids": compatible or [model_id],
+                "payload": {
+                    "unit": part.unit,
+                    "brand": part.brand,
+                },
+            }
+        )
+
+    if normalized_query:
+        lowered = normalized_query.lower()
+        filtered: list[dict[str, Any]] = []
+        for item in items:
+            haystack = " ".join(
+                [
+                    compact_whitespace(str(item.get("name") or "")).lower(),
+                    compact_whitespace(str(item.get("description") or "")).lower(),
+                    compact_whitespace(str(item.get("category") or "")).lower(),
+                    compact_whitespace(str(item.get("product_type") or "")).lower(),
+                ]
+            )
+            if lowered in haystack or any(token and token in haystack for token in lowered.split()):
+                filtered.append(item)
+        items = filtered
+
+    return items[:limit]
 
 
 def _search_vehicle_catalog_models(db: Session, query: str, limit: int = 12) -> list[dict[str, Any]]:
@@ -748,13 +935,14 @@ async def get_ai_context(
     vehicle_catalog_models = _search_vehicle_catalog_models(db, normalized_query or "")
 
     customer_ref = customers[0]["id"] if customers else partner_id
+    work_order_query = normalized_query if work_order_id is None and normalized_plate is None and customer_ref is None else None
     work_orders = _search_work_orders(
         db,
         store_id,
         work_order_id=work_order_id,
         customer_id=customer_ref,
         plate=normalized_plate,
-        query=normalized_query if work_order_id is None and normalized_plate is None else None,
+        query=work_order_query,
     )
     if not vehicles and work_orders:
         first_order = work_orders[0] or {}
@@ -788,6 +976,8 @@ async def get_ai_context(
         primary_vehicle["catalog_model_id"] = catalog_model_id
 
     parts = _search_parts(db, normalized_query or "")
+    service_items = _search_service_items(db, catalog_model_id, normalized_query or "")
+    shop_items = _shop_items(db, catalog_model_id, normalized_query or "")
     recommended_services = _recommend_services(db, catalog_model_id)
     knowledge_docs = _knowledge_docs(db, catalog_model_id)
     query_domains = _infer_query_domains(
@@ -800,11 +990,13 @@ async def get_ai_context(
         work_orders,
         vehicle_catalog_models,
         parts,
+        service_items,
+        shop_items,
         knowledge_docs,
     )
     if (
         "project_system" in query_domains
-        and any(domain in query_domains for domain in ["catalog", "customer", "vehicle", "work_order", "knowledge", "parts_inventory"])
+        and any(domain in query_domains for domain in ["catalog", "shop", "customer", "vehicle", "work_order", "knowledge", "parts_inventory", "service_items"])
         and not any(keyword in (normalized_query or "") for keyword in ["模块", "架构", "数据库", "前端", "后端", "odoo", "bff", "ai"])
     ):
         query_domains = [domain for domain in query_domains if domain != "project_system"]
@@ -825,6 +1017,8 @@ async def get_ai_context(
         "vehicle_catalog_models": vehicle_catalog_models[:12],
         "work_orders": work_orders[:10],
         "recommended_services": recommended_services,
+        "service_items": service_items,
+        "shop_items": shop_items,
         "knowledge_docs": knowledge_docs,
         "parts": parts,
         "write_capabilities": ALLOWED_WRITE_ACTIONS,
@@ -1037,6 +1231,462 @@ def _update_work_order_status(
     return {"work_order_id": work_order.uuid, "status": work_order.status}
 
 
+_DB_ENGINE_CACHE: dict[str, Engine] = {}
+_DB_DELETE_TOKEN_TTL_SECONDS = 600
+_DB_UNDO_ROW_LIMIT = 5000
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode("ascii")
+    return value
+
+
+def _target_database_name(target_database: str | None) -> str:
+    target = compact_whitespace(target_database or "bff").lower()
+    if target not in {"bff", "odoo"}:
+        raise HTTPException(status_code=400, detail="target_database must be bff or odoo")
+    return target
+
+
+def _engine_for_target_database(target_database: str | None) -> Engine:
+    target = _target_database_name(target_database)
+    if target in _DB_ENGINE_CACHE:
+        return _DB_ENGINE_CACHE[target]
+    if settings.DATABASE_URL.startswith("sqlite"):
+        if target != "bff":
+            raise HTTPException(status_code=400, detail="odoo target is unavailable for sqlite")
+        engine = create_engine(settings.DATABASE_URL)
+    else:
+        url = make_url(settings.DATABASE_URL)
+        database = "odoo" if target == "odoo" else (url.database or "bff")
+        engine = create_engine(
+            url.set(database=database),
+            pool_pre_ping=True,
+            pool_recycle=settings.DB_POOL_RECYCLE_SECONDS,
+            connect_args={"client_encoding": "utf8"} if settings.DATABASE_URL.startswith("postgresql") else {},
+        )
+    _DB_ENGINE_CACHE[target] = engine
+    return engine
+
+
+def _reflect_table(engine: Engine, table_name: str, schema: str | None = None) -> Table:
+    table = compact_whitespace(table_name)
+    if not table:
+        raise HTTPException(status_code=400, detail="table is required")
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names(schema=schema):
+        raise HTTPException(status_code=404, detail=f"table not found: {table}")
+    metadata = MetaData()
+    return Table(table, metadata, autoload_with=engine, schema=schema)
+
+
+def _normalize_columns(table: Table, requested: Any) -> list[Any]:
+    if requested in (None, "", ["*"], "*"):
+        return list(table.c)
+    if not isinstance(requested, list):
+        raise HTTPException(status_code=400, detail="columns must be a list or '*'")
+    result = []
+    for name in requested:
+        key = compact_whitespace(name)
+        if key not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown column: {key}")
+        result.append(table.c[key])
+    return result or list(table.c)
+
+
+def _build_where(table: Table, filters: Any) -> list[Any]:
+    if not filters:
+        return []
+    if not isinstance(filters, dict):
+        raise HTTPException(status_code=400, detail="filters must be an object")
+    clauses = []
+    for key, raw in filters.items():
+        column_name = compact_whitespace(key)
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown filter column: {column_name}")
+        column = table.c[column_name]
+        op = "eq"
+        value = raw
+        if isinstance(raw, dict):
+            op = compact_whitespace(raw.get("op") or "eq").lower()
+            value = raw.get("value")
+        if op == "eq":
+            clauses.append(column == value)
+        elif op == "ne":
+            clauses.append(column != value)
+        elif op == "gt":
+            clauses.append(column > value)
+        elif op == "gte":
+            clauses.append(column >= value)
+        elif op == "lt":
+            clauses.append(column < value)
+        elif op == "lte":
+            clauses.append(column <= value)
+        elif op == "like":
+            clauses.append(column.like(str(value or "")))
+        elif op == "ilike":
+            clauses.append(column.ilike(str(value or "")))
+        elif op == "in":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail=f"filter {column_name} requires list value")
+            clauses.append(column.in_(value))
+        elif op == "is_null":
+            clauses.append(column.is_(None) if bool(value) else column.is_not(None))
+        else:
+            raise HTTPException(status_code=400, detail=f"unsupported filter op: {op}")
+    return clauses
+
+
+def _validate_values(table: Table, values: Any) -> dict[str, Any]:
+    if not isinstance(values, dict) or not values:
+        raise HTTPException(status_code=400, detail="values must be a non-empty object")
+    cleaned: dict[str, Any] = {}
+    for key, value in values.items():
+        column_name = compact_whitespace(key)
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown value column: {column_name}")
+        cleaned[column_name] = value
+    return cleaned
+
+
+def _database_schema(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table_filter = compact_whitespace(payload.get("table"))
+    inspector = inspect(engine)
+    tables = []
+    for table_name in inspector.get_table_names(schema=schema):
+        if table_filter and table_name != table_filter:
+            continue
+        columns = [
+            {
+                "name": column["name"],
+                "type": str(column.get("type")),
+                "nullable": bool(column.get("nullable")),
+                "default": str(column.get("default")) if column.get("default") is not None else None,
+                "primary_key": bool(column.get("primary_key")),
+            }
+            for column in inspector.get_columns(table_name, schema=schema)
+        ]
+        tables.append({"table": table_name, "columns": columns})
+    return {"target_database": _target_database_name(payload.get("target_database")), "tables": tables}
+
+
+def _database_select(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    table = _reflect_table(engine, payload.get("table"), compact_whitespace(payload.get("schema")) or None)
+    columns = _normalize_columns(table, payload.get("columns"))
+    limit = min(max(int(payload.get("limit") or 50), 1), 500)
+    stmt = select(*columns).where(*_build_where(table, payload.get("filters"))).limit(limit)
+    order_by = compact_whitespace(payload.get("order_by"))
+    if order_by:
+        desc = order_by.startswith("-")
+        column_name = order_by[1:] if desc else order_by
+        if column_name not in table.c:
+            raise HTTPException(status_code=400, detail=f"unknown order_by column: {column_name}")
+        stmt = stmt.order_by(table.c[column_name].desc() if desc else table.c[column_name].asc())
+    with engine.connect() as conn:
+        rows = [dict(row._mapping) for row in conn.execute(stmt).fetchall()]
+    return {
+        "target_database": _target_database_name(payload.get("target_database")),
+        "table": table.name,
+        "row_count": len(rows),
+        "rows": [{key: _json_safe(value) for key, value in row.items()} for row in rows],
+    }
+
+
+def _json_safe_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {key: _json_safe(value) for key, value in row.items()}
+
+
+def _primary_key_columns(table: Table) -> list[str]:
+    return [column.name for column in table.primary_key.columns]
+
+
+def _pk_filters_for_row(table: Table, row: dict[str, Any]) -> dict[str, Any]:
+    pk_columns = _primary_key_columns(table)
+    if not pk_columns:
+        raise HTTPException(status_code=400, detail=f"table {table.name} has no primary key; undo is unavailable")
+    missing = [name for name in pk_columns if name not in row]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"missing primary key values for undo: {', '.join(missing)}")
+    return {name: row[name] for name in pk_columns}
+
+
+def _select_rows_for_undo(conn: Any, table: Table, filters: Any, limit: int = _DB_UNDO_ROW_LIMIT) -> list[dict[str, Any]]:
+    stmt = select(*list(table.c)).where(*_build_where(table, filters)).limit(limit + 1)
+    rows = [dict(row._mapping) for row in conn.execute(stmt).fetchall()]
+    if len(rows) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"operation affects more than {limit} rows; narrow filters before using AI database write tools",
+        )
+    return rows
+
+
+def _build_pk_where(table: Table, row: dict[str, Any]) -> list[Any]:
+    return _build_where(table, _pk_filters_for_row(table, row))
+
+
+def _write_ai_ops_audit(
+    db: Session,
+    actor_id: str,
+    action: str,
+    target: dict[str, Any],
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+    store_id: str,
+) -> int | None:
+    try:
+        log = AuditLog(
+            store_id=store_id,
+            actor_id=actor_id,
+            action=f"ai_ops:{action}",
+            target_entity=json.dumps(target, ensure_ascii=True, sort_keys=True),
+            before_state=before,
+            after_state=after,
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        return int(log.id)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("AI ops database audit failed: %s", exc)
+        return None
+
+
+def _attach_database_audit(
+    result: dict[str, Any],
+    target_database: str,
+    schema: str | None,
+    table: Table,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+) -> dict[str, Any]:
+    result["_audit"] = {
+        "target": {
+            "target_database": target_database,
+            "schema": schema,
+            "table": table.name,
+        },
+        "before": before,
+        "after": after,
+    }
+    return result
+
+
+def _database_insert(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    target_database = _target_database_name(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table = _reflect_table(engine, payload.get("table"), schema)
+    values = _validate_values(table, payload.get("values"))
+    with engine.begin() as conn:
+        result = conn.execute(insert(table).values(**values))
+        pk = list(result.inserted_primary_key) if result.inserted_primary_key else []
+        inserted_rows: list[dict[str, Any]] = []
+        pk_columns = _primary_key_columns(table)
+        if pk and pk_columns and len(pk) == len(pk_columns):
+            inserted_rows = _select_rows_for_undo(conn, table, dict(zip(pk_columns, pk)), limit=1)
+    safe_rows = [_json_safe_row(row) for row in inserted_rows]
+    response = {"target_database": target_database, "table": table.name, "inserted_primary_key": [_json_safe(value) for value in pk]}
+    undo = {"type": "delete_inserted", "rows": safe_rows, "available": bool(safe_rows)}
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"payload": {"values": _json_safe_row(values)}},
+        after={**response, "inserted_rows": safe_rows, "undo": undo},
+    )
+
+
+def _database_update(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    target_database = _target_database_name(payload.get("target_database"))
+    schema = compact_whitespace(payload.get("schema")) or None
+    table = _reflect_table(engine, payload.get("table"), schema)
+    if not _primary_key_columns(table):
+        raise HTTPException(status_code=400, detail=f"table {table.name} has no primary key; update undo is unavailable")
+    values = _validate_values(table, payload.get("values"))
+    filters = payload.get("filters")
+    if not filters and not bool(payload.get("allow_all")):
+        raise HTTPException(status_code=400, detail="filters are required for database_update unless allow_all=true")
+    with engine.begin() as conn:
+        before_rows = _select_rows_for_undo(conn, table, filters)
+        stmt = update(table).values(**values).where(*_build_where(table, filters))
+        result = conn.execute(stmt)
+    safe_before_rows = [_json_safe_row(row) for row in before_rows]
+    response = {"target_database": target_database, "table": table.name, "updated_rows": int(result.rowcount or 0)}
+    undo = {"type": "restore_updated", "rows": safe_before_rows, "available": bool(safe_before_rows)}
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"filters": payload.get("filters") or {}, "rows": safe_before_rows},
+        after={**response, "values": _json_safe_row(values), "undo": undo},
+    )
+
+
+def _delete_token_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "target_database": _target_database_name(payload.get("target_database")),
+        "schema": compact_whitespace(payload.get("schema")) or None,
+        "table": compact_whitespace(payload.get("table")),
+        "filters": payload.get("filters") or {},
+        "allow_all": bool(payload.get("allow_all")),
+    }
+
+
+def _sign_delete_payload(payload: dict[str, Any]) -> str:
+    token_payload = {**_delete_token_payload(payload), "exp": int(time.time()) + _DB_DELETE_TOKEN_TTL_SECONDS, "nonce": uuid.uuid4().hex}
+    raw = json.dumps(token_payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    sig = hmac.new(settings.SECRET_KEY.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    return base64.urlsafe_b64encode(raw).decode("ascii") + "." + sig
+
+
+def _verify_delete_token(token: str) -> dict[str, Any]:
+    try:
+        raw_b64, sig = str(token or "").split(".", 1)
+        raw = base64.urlsafe_b64decode(raw_b64.encode("ascii"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid delete confirmation token") from exc
+    expected = hmac.new(settings.SECRET_KEY.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=400, detail="invalid delete confirmation token signature")
+    payload = json.loads(raw.decode("utf-8"))
+    if int(payload.get("exp") or 0) < int(time.time()):
+        raise HTTPException(status_code=400, detail="delete confirmation token expired")
+    return payload
+
+
+def _database_delete_plan(payload: dict[str, Any]) -> dict[str, Any]:
+    engine = _engine_for_target_database(payload.get("target_database"))
+    token_payload = _delete_token_payload(payload)
+    table = _reflect_table(engine, token_payload["table"], token_payload.get("schema"))
+    if not token_payload["filters"] and not token_payload["allow_all"]:
+        raise HTTPException(status_code=400, detail="filters are required for delete unless allow_all=true")
+    count_stmt = select(table.c[list(table.c.keys())[0]]).where(*_build_where(table, token_payload["filters"])).limit(1000)
+    with engine.connect() as conn:
+        preview_rows = [dict(row._mapping) for row in conn.execute(count_stmt).fetchall()]
+    return {
+        **token_payload,
+        "risk_level": "critical",
+        "requires_confirmation": True,
+        "preview_row_count_limited": len(preview_rows),
+        "preview_rows": [{key: _json_safe(value) for key, value in row.items()} for row in preview_rows[:20]],
+        "confirmation_token": _sign_delete_payload(token_payload),
+        "expires_in_seconds": _DB_DELETE_TOKEN_TTL_SECONDS,
+    }
+
+
+def _database_delete_confirm(payload: dict[str, Any]) -> dict[str, Any]:
+    token_payload = _verify_delete_token(str(payload.get("confirmation_token") or ""))
+    engine = _engine_for_target_database(token_payload.get("target_database"))
+    table = _reflect_table(engine, token_payload["table"], token_payload.get("schema"))
+    if not token_payload["filters"] and not token_payload["allow_all"]:
+        raise HTTPException(status_code=400, detail="filters are required for delete unless allow_all=true")
+    with engine.begin() as conn:
+        before_rows = _select_rows_for_undo(conn, table, token_payload["filters"])
+        stmt = delete(table).where(*_build_where(table, token_payload["filters"]))
+        result = conn.execute(stmt)
+    safe_before_rows = [_json_safe_row(row) for row in before_rows]
+    response = {
+        "target_database": token_payload["target_database"],
+        "table": table.name,
+        "deleted_rows": int(result.rowcount or 0),
+    }
+    undo = {"type": "restore_deleted", "rows": safe_before_rows, "available": bool(safe_before_rows)}
+    return _attach_database_audit(
+        response,
+        token_payload["target_database"],
+        token_payload.get("schema"),
+        table,
+        before={"filters": token_payload["filters"], "rows": safe_before_rows},
+        after={**response, "undo": undo},
+    )
+
+
+def _database_undo(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
+    undo_id = int(payload.get("undo_id") or 0)
+    if undo_id <= 0:
+        raise HTTPException(status_code=400, detail="undo_id is required")
+
+    audit = db.query(AuditLog).filter(AuditLog.id == undo_id).first()
+    if not audit:
+        raise HTTPException(status_code=404, detail=f"audit log not found: {undo_id}")
+    if not str(audit.action or "").startswith("ai_ops:database_"):
+        raise HTTPException(status_code=400, detail="only AI database operations can be undone here")
+
+    after_state = audit.after_state if isinstance(audit.after_state, dict) else {}
+    undo = after_state.get("undo") if isinstance(after_state.get("undo"), dict) else None
+    if not undo or not undo.get("available"):
+        raise HTTPException(status_code=400, detail="this operation has no available undo snapshot")
+    if undo.get("undone_at"):
+        raise HTTPException(status_code=400, detail="this operation has already been undone")
+
+    target = json.loads(audit.target_entity or "{}")
+    target_database = _target_database_name(payload.get("target_database") or target.get("target_database"))
+    schema = compact_whitespace(payload.get("schema") or target.get("schema")) or None
+    table_name = compact_whitespace(payload.get("table") or target.get("table"))
+    engine = _engine_for_target_database(target_database)
+    table = _reflect_table(engine, table_name, schema)
+    rows = undo.get("rows") if isinstance(undo.get("rows"), list) else []
+    if len(rows) > _DB_UNDO_ROW_LIMIT:
+        raise HTTPException(status_code=400, detail=f"undo snapshot exceeds {_DB_UNDO_ROW_LIMIT} rows")
+
+    undo_type = compact_whitespace(undo.get("type"))
+    affected = 0
+    with engine.begin() as conn:
+        if undo_type == "delete_inserted":
+            for row in rows:
+                result = conn.execute(delete(table).where(*_build_pk_where(table, row)))
+                affected += int(result.rowcount or 0)
+        elif undo_type == "restore_updated":
+            for row in rows:
+                values = _validate_values(table, {key: value for key, value in row.items() if key in table.c})
+                result = conn.execute(update(table).values(**values).where(*_build_pk_where(table, row)))
+                affected += int(result.rowcount or 0)
+        elif undo_type == "restore_deleted":
+            for row in rows:
+                values = _validate_values(table, {key: value for key, value in row.items() if key in table.c})
+                conn.execute(insert(table).values(**values))
+                affected += 1
+        else:
+            raise HTTPException(status_code=400, detail=f"unsupported undo type: {undo_type}")
+
+    undo["undone_at"] = datetime.utcnow().isoformat() + "Z"
+    undo["undone_rows"] = affected
+    after_state["undo"] = undo
+    audit.after_state = after_state
+    db.add(audit)
+    db.commit()
+
+    response = {
+        "undo_id": undo_id,
+        "undone_action": audit.action,
+        "target_database": target_database,
+        "table": table.name,
+        "undo_type": undo_type,
+        "affected_rows": affected,
+    }
+    return _attach_database_audit(
+        response,
+        target_database,
+        schema,
+        table,
+        before={"undo_id": undo_id, "original_action": audit.action, "undo": undo},
+        after=response,
+    )
+
+
 @router.post("/actions", response_model=AiActionResponse)
 async def execute_ai_action(
     payload: AiActionRequest,
@@ -1052,7 +1702,26 @@ async def execute_ai_action(
     result: dict[str, Any]
     risk_level = "low"
 
-    if action == "create_customer":
+    if action == "database_schema":
+        result = _database_schema(payload.payload)
+    elif action == "database_select":
+        result = _database_select(payload.payload)
+    elif action == "database_insert":
+        result = _database_insert(payload.payload)
+        risk_level = "high"
+    elif action == "database_update":
+        result = _database_update(payload.payload)
+        risk_level = "high"
+    elif action == "database_delete_plan":
+        result = _database_delete_plan(payload.payload)
+        risk_level = "critical"
+    elif action == "database_delete_confirm":
+        result = _database_delete_confirm(payload.payload)
+        risk_level = "critical"
+    elif action == "database_undo":
+        result = _database_undo(db, payload.payload)
+        risk_level = "critical"
+    elif action == "create_customer":
         customer = CustomerCreate(**payload.payload)
         new_id = odoo_client.execute_kw(
             "res.partner",
@@ -1212,13 +1881,31 @@ async def execute_ai_action(
         result = _part_to_response(row, profile)
         risk_level = "medium"
 
-    log_audit(
-        db,
-        actor_id=actor.username,
-        action=f"ai_ops:{action}",
-        target=json.dumps({"store_id": store_id}, ensure_ascii=True),
-        before=None,
-        after=result,
-        store_id=store_id,
-    )
+    database_audit = result.pop("_audit", None)
+    if database_audit:
+        audit_id = _write_ai_ops_audit(
+            db,
+            actor_id=actor.username,
+            action=action,
+            target={**database_audit["target"], "store_id": store_id},
+            before=database_audit.get("before"),
+            after=database_audit.get("after"),
+            store_id=store_id,
+        )
+        result["audit_id"] = audit_id
+        undo = (database_audit.get("after") or {}).get("undo")
+        if isinstance(undo, dict):
+            result["undo_available"] = bool(undo.get("available"))
+            if undo.get("available"):
+                result["undo_id"] = audit_id
+    else:
+        log_audit(
+            db,
+            actor_id=actor.username,
+            action=f"ai_ops:{action}",
+            target=json.dumps({"store_id": store_id}, ensure_ascii=True),
+            before=None,
+            after=result,
+            store_id=store_id,
+        )
     return {"status": "ok", "action": action, "result": result, "risk_level": risk_level}

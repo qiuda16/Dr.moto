@@ -9,6 +9,19 @@
       <el-button type="primary" plain :loading="syncing" @click="syncCatalog">同步车型基础库</el-button>
     </div>
 
+    <el-alert
+      v-if="pageError"
+      :title="pageError"
+      type="error"
+      show-icon
+      :closable="false"
+      class="page-alert"
+    >
+      <template #default>
+        <el-button text type="primary" @click="retryActiveTabLoad">重新加载当前数据</el-button>
+      </template>
+    </el-alert>
+
     <div class="summary-grid">
       <div class="card summary-card"><span>车型数</span><strong>{{ vehiclePager.total }}</strong></div>
       <div class="card summary-card"><span>配件数</span><strong>{{ partPager.total }}</strong></div>
@@ -66,7 +79,7 @@
             <el-button type="success" @click="openVehicleDialog()">新增标准车型</el-button>
           </div>
 
-          <el-table :data="vehicleRows" v-loading="vehicleLoading" style="width: 100%" @row-dblclick="openVehicleDetail">
+          <el-table :data="vehicleRows" v-loading="vehicleLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.vehicleCatalog" style="width: 100%" @row-dblclick="openVehicleDetail">
             <el-table-column prop="brand" label="品牌" width="140" />
             <el-table-column prop="model_name" label="车型" min-width="180" />
             <el-table-column label="年份" width="140">
@@ -99,7 +112,7 @@
             <el-button type="success" @click="openPartDialog()">新增标准配件</el-button>
           </div>
 
-          <el-table :data="partRows" v-loading="partLoading" style="width: 100%" @row-dblclick="openPartDialog">
+          <el-table :data="partRows" v-loading="partLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.parts" style="width: 100%" @row-dblclick="openPartDialog">
             <el-table-column prop="part_no" label="料号" width="160" />
             <el-table-column prop="name" label="名称" min-width="180" />
             <el-table-column prop="brand" label="品牌" width="120" />
@@ -170,7 +183,7 @@
             <el-button @click="resetLibraryFilters">重置</el-button>
           </div>
 
-          <el-table :data="libraryDocuments" v-loading="libraryLoading" style="width: 100%" @row-dblclick="openLibraryRow">
+          <el-table :data="libraryDocuments" v-loading="libraryLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.documents" style="width: 100%" @row-dblclick="openLibraryRow">
             <el-table-column prop="title" label="资料名称" min-width="220" show-overflow-tooltip />
             <el-table-column prop="category" label="分类" width="120" />
             <el-table-column prop="file_name" label="文件名" min-width="200" show-overflow-tooltip />
@@ -279,13 +292,13 @@
     </div>
 
     <el-dialog v-model="vehicleDialogVisible" :title="vehicleForm.id ? '编辑车型' : '新增车型'" width="720px">
-      <el-form :model="vehicleForm" label-width="110px">
+      <el-form ref="vehicleFormRef" :model="vehicleForm" :rules="vehicleRules" label-width="110px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="品牌"><el-input v-model="vehicleForm.brand" maxlength="80" show-word-limit /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="车型"><el-input v-model="vehicleForm.model_name" maxlength="120" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="brand" :label="requiredLabel('品牌')"><el-input v-model="vehicleForm.brand" maxlength="80" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="model_name" :label="requiredLabel('车型')"><el-input v-model="vehicleForm.model_name" maxlength="120" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="起始年份"><el-input-number v-model="vehicleForm.year_from" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="year_from" :label="requiredLabel('起始年份')"><el-input-number v-model="vehicleForm.year_from" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="截止年份"><el-input-number v-model="vehicleForm.year_to" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
@@ -300,10 +313,10 @@
     </el-dialog>
 
     <el-dialog v-model="partDialogVisible" :title="partForm.id ? '编辑配件' : '新增配件'" width="760px">
-      <el-form :model="partForm" label-width="110px">
+      <el-form ref="partFormRef" :model="partForm" :rules="partRules" label-width="110px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="料号"><el-input v-model="partForm.part_no" maxlength="80" show-word-limit /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="名称"><el-input v-model="partForm.name" maxlength="120" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="part_no" :label="requiredLabel('料号')"><el-input v-model="partForm.part_no" maxlength="80" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="name" :label="requiredLabel('名称')"><el-input v-model="partForm.name" maxlength="120" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="品牌"><el-input v-model="partForm.brand" maxlength="80" show-word-limit /></el-form-item></el-col>
@@ -338,7 +351,7 @@
           <el-button type="primary" @click="openServiceItemDialog()">新增标准项目</el-button>
         </div>
       </div>
-      <el-table :data="serviceItems" v-loading="serviceLoading" style="width: 100%">
+      <el-table :data="serviceItems" v-loading="serviceLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.serviceItems" style="width: 100%">
         <el-table-column prop="service_name" label="标准项目" min-width="180" />
         <el-table-column prop="service_code" label="编码" width="120" />
         <el-table-column prop="labor_hours" label="工时(h)" width="90" />
@@ -383,7 +396,7 @@
             <el-button type="primary" @click="openServicePackageDialog()">新增套餐</el-button>
           </div>
         </div>
-        <el-table :data="servicePackages" v-loading="servicePackageLoading" style="width: 100%">
+        <el-table :data="servicePackages" v-loading="servicePackageLoading" :element-loading-text="TABLE_LOADING_TEXT" :empty-text="EMPTY_TEXT.servicePackages" style="width: 100%">
           <el-table-column prop="package_name" label="套餐名称" min-width="180" />
           <el-table-column prop="package_code" label="编码" width="140" />
           <el-table-column label="建议周期" min-width="160">
@@ -428,7 +441,7 @@
           </div>
           <el-button @click="openVehicleSpecDialog()">新增参数</el-button>
         </div>
-        <el-table :data="vehicleSpecs" style="width: 100%">
+        <el-table :data="vehicleSpecs" :empty-text="EMPTY_TEXT.vehicleSpecs" style="width: 100%">
           <el-table-column prop="spec_label" label="参数名称" min-width="180" />
           <el-table-column prop="spec_type" label="类型" width="120" />
           <el-table-column label="参数值" width="160">
@@ -468,7 +481,7 @@
             共 {{ knowledgeSegments.length }} 条，当前显示 {{ filteredKnowledgeSegments.length }} 条
           </div>
         </div>
-        <el-table :data="filteredKnowledgeSegments" style="width: 100%">
+        <el-table :data="filteredKnowledgeSegments" :empty-text="EMPTY_TEXT.knowledgeSegments" style="width: 100%">
           <el-table-column prop="chapter_no" label="章节号" width="90" />
           <el-table-column prop="title" label="章节名称" min-width="220" />
           <el-table-column label="页码范围" width="120">
@@ -502,7 +515,7 @@
             <p>把原厂手册里的标准步骤、扭矩、工具和注意事项整理成标准作业卡，后面可进一步接到工单和打印单据里。</p>
           </div>
         </div>
-        <el-table :data="manualProcedures" style="width: 100%">
+        <el-table :data="manualProcedures" :empty-text="EMPTY_TEXT.manualCards" style="width: 100%">
           <el-table-column prop="name" label="作业卡名称" min-width="220" />
           <el-table-column prop="description" label="说明" min-width="260" show-overflow-tooltip />
           <el-table-column prop="steps_count" label="步骤数" width="90" />
@@ -595,9 +608,9 @@
     </el-dialog>
 
     <el-dialog v-model="serviceItemDialogVisible" :title="serviceItemForm.id ? '编辑标准项目' : '新增标准项目'" width="880px" destroy-on-close>
-      <el-form :model="serviceItemForm" label-width="110px">
+      <el-form ref="serviceItemFormRef" :model="serviceItemForm" :rules="serviceItemRules" label-width="110px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="标准项目名称"><el-input v-model="serviceItemForm.service_name" maxlength="120" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="service_name" :label="requiredLabel('标准项目名称')"><el-input v-model="serviceItemForm.service_name" maxlength="120" show-word-limit /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="标准项目编码"><el-input v-model="serviceItemForm.service_code" maxlength="60" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
@@ -629,9 +642,9 @@
     </el-dialog>
 
     <el-dialog v-model="servicePackageDialogVisible" :title="servicePackageForm.id ? '编辑服务套餐' : '新增服务套餐'" width="820px" destroy-on-close>
-      <el-form :model="servicePackageForm" label-width="110px">
+      <el-form ref="servicePackageFormRef" :model="servicePackageForm" :rules="servicePackageRules" label-width="110px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="套餐名称"><el-input v-model="servicePackageForm.package_name" maxlength="120" show-word-limit /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="package_name" :label="requiredLabel('套餐名称')"><el-input v-model="servicePackageForm.package_name" maxlength="120" show-word-limit /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="套餐编码"><el-input v-model="servicePackageForm.package_code" maxlength="60" show-word-limit /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
@@ -639,7 +652,7 @@
           <el-col :span="12"><el-form-item label="建议月数"><el-input-number v-model="servicePackageForm.recommended_interval_months" :min="0" style="width: 100%" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="套餐说明"><el-input v-model="servicePackageForm.description" type="textarea" :rows="3" maxlength="1000" show-word-limit /></el-form-item>
-        <el-form-item label="包含标准项目">
+        <el-form-item prop="service_item_ids" :label="requiredLabel('包含标准项目')">
                     <el-select v-model="servicePackageForm.service_item_ids" multiple filterable placeholder="选择标准项目" style="width: 100%">
             <el-option v-for="item in serviceItems" :key="item.id" :label="item.service_name" :value="item.id" />
           </el-select>
@@ -662,8 +675,8 @@
     </el-dialog>
 
     <el-dialog v-model="manualProcedureDialogVisible" :title="manualProcedureForm.id ? '编辑标准作业卡' : '新增标准作业卡'" width="720px">
-      <el-form :model="manualProcedureForm" label-width="110px">
-        <el-form-item label="作业卡名称"><el-input v-model="manualProcedureForm.name" maxlength="120" show-word-limit placeholder="例如：更换前刹车片标准作业" /></el-form-item>
+      <el-form ref="manualProcedureFormRef" :model="manualProcedureForm" :rules="manualProcedureRules" label-width="110px">
+        <el-form-item prop="name" :label="requiredLabel('作业卡名称')"><el-input v-model="manualProcedureForm.name" maxlength="120" show-word-limit placeholder="例如：更换前刹车片标准作业" /></el-form-item>
         <el-form-item label="专业说明"><el-input v-model="manualProcedureForm.description" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="这里可以写作业目的、质量要求、可向客户说明的专业点" /></el-form-item>
       </el-form>
       <template #footer>
@@ -673,9 +686,9 @@
     </el-dialog>
 
     <el-dialog v-model="vehicleSpecDialogVisible" :title="vehicleSpecForm.id ? '编辑标准规格' : '新增标准规格'" width="760px">
-      <el-form :model="vehicleSpecForm" label-width="100px">
+      <el-form ref="vehicleSpecFormRef" :model="vehicleSpecForm" :rules="vehicleSpecRules" label-width="100px">
         <el-row :gutter="12">
-          <el-col :span="12"><el-form-item label="规格名称"><el-input v-model="vehicleSpecForm.spec_label" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item prop="spec_label" :label="requiredLabel('规格名称')"><el-input v-model="vehicleSpecForm.spec_label" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="规格键"><el-input v-model="vehicleSpecForm.spec_key" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="12">
@@ -776,7 +789,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="备注"><el-input v-model="documentForm.notes" type="textarea" :rows="3" maxlength="2000" show-word-limit /></el-form-item>
-        <el-form-item label="PDF文件">
+        <el-form-item :label="requiredLabel('PDF文件')">
           <input ref="documentFileInput" type="file" accept=".pdf,application/pdf" />
         </el-form-item>
       </el-form>
@@ -1547,7 +1560,7 @@
     <el-dialog v-model="catalogConfirmationDialogVisible" :title="catalogConfirmationMode === 'bind_existing' ? '绑定到现有车型' : '新建并确认车型'" width="720px">
       <el-form :model="catalogConfirmationForm" label-width="110px">
         <template v-if="catalogConfirmationMode === 'bind_existing'">
-          <el-form-item label="选择车型">
+          <el-form-item :label="requiredLabel('选择车型')">
             <el-select v-model="catalogConfirmationForm.model_id" filterable placeholder="请选择标准车型" style="width: 100%">
               <el-option v-for="item in existingCatalogModelOptions" :key="item.id" :label="item.label" :value="item.id" />
             </el-select>
@@ -1555,11 +1568,11 @@
         </template>
         <template v-else>
           <el-row :gutter="12">
-            <el-col :span="12"><el-form-item label="品牌"><el-input v-model="catalogConfirmationForm.brand" /></el-form-item></el-col>
-            <el-col :span="12"><el-form-item label="车型"><el-input v-model="catalogConfirmationForm.model_name" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item :label="requiredLabel('品牌')"><el-input v-model="catalogConfirmationForm.brand" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item :label="requiredLabel('车型')"><el-input v-model="catalogConfirmationForm.model_name" /></el-form-item></el-col>
           </el-row>
           <el-row :gutter="12">
-            <el-col :span="12"><el-form-item label="起始年份"><el-input-number v-model="catalogConfirmationForm.year_from" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item :label="requiredLabel('起始年份')"><el-input-number v-model="catalogConfirmationForm.year_from" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="截止年份"><el-input-number v-model="catalogConfirmationForm.year_to" :min="1950" :max="2100" style="width: 100%" /></el-form-item></el-col>
           </el-row>
           <el-row :gutter="12">
@@ -1597,14 +1610,14 @@
       </div>
       <template v-if="resultListEditorType === 'sections'">
         <div v-for="(item, index) in resultListEditorRows" :key="index" class="manual-step-row">
-          <el-input v-model="item.title" placeholder="章节标题" style="width: 320px" />
+          <el-input v-model="item.title" placeholder="章节标题 *" style="width: 320px" />
           <el-input v-model="item.page_number" placeholder="页码" style="width: 120px" />
           <el-button link type="danger" @click="removeResultListEditorRow(index)">移除</el-button>
         </div>
       </template>
       <template v-else-if="resultListEditorType === 'specs'">
         <div v-for="(item, index) in resultListEditorRows" :key="index" class="manual-step-row">
-          <el-input v-model="item.label" placeholder="标签" style="width: 150px" />
+          <el-input v-model="item.label" placeholder="标签 *" style="width: 150px" />
           <el-input v-model="item.type" placeholder="类型" style="width: 120px" />
           <el-input v-model="item.value" placeholder="值" style="width: 120px" />
           <el-input v-model="item.unit" placeholder="单位" style="width: 100px" />
@@ -1616,7 +1629,7 @@
       <template v-else>
         <div v-for="(item, index) in resultListEditorRows" :key="index" class="manual-step-row">
           <el-input-number v-model="item.step_order" :min="1" style="width: 90px" />
-          <el-input v-model="item.instruction" placeholder="步骤内容" style="width: 260px" />
+          <el-input v-model="item.instruction" placeholder="步骤内容 *" style="width: 260px" />
           <el-input v-model="item.required_tools" placeholder="工具" style="width: 130px" />
           <el-input v-model="item.torque_spec" placeholder="扭矩/规格" style="width: 120px" />
           <el-input v-model="item.page_number" placeholder="页码" style="width: 100px" />
@@ -1677,7 +1690,22 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import request from '../utils/request'
+import { getAuthToken } from '../utils/auth'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
+import { requiredLabel } from '../utils/labels'
+
+const requiredFieldRule = (message) => ({ required: true, message, trigger: ['blur', 'change'] })
+const validateForm = async (formRef) => {
+  if (!formRef?.validate) return true
+  try {
+    await formRef.validate()
+    return true
+  } catch {
+    return false
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -1702,19 +1730,39 @@ const vehiclePager = reactive({ page: 1, size: 50, total: 0 })
 const vehicleFilters = reactive({ brand: '', model_name: '', category: '', keyword: '' })
 const vehicleDialogVisible = ref(false)
 const vehicleDetailVisible = ref(false)
+const vehicleFormRef = ref(null)
 const vehicleForm = reactive({ id: null, brand: '', model_name: '', year_from: new Date().getFullYear(), year_to: new Date().getFullYear(), displacement_cc: null, category: '', fuel_type: 'gasoline', default_engine_code: '' })
 const vehicleDetail = reactive({ id: null, brand: '', model_name: '', year_from: null, year_to: null })
+const vehicleRules = {
+  brand: [requiredFieldRule('请填写品牌')],
+  model_name: [requiredFieldRule('请填写车型')],
+  year_from: [requiredFieldRule('请选择起始年份')]
+}
 const appSettings = reactive(createAppSettingsState())
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 const serviceItems = ref([])
 const servicePackages = ref([])
 const vehicleSpecs = ref([])
 const vehicleSpecDialogVisible = ref(false)
 const vehicleSpecSaving = ref(false)
+const vehicleSpecFormRef = ref(null)
 const vehicleSpecForm = reactive({ id: null, spec_key: '', spec_label: '', spec_type: '', spec_value: '', spec_unit: '', source_page: '', source_text: '', review_status: 'confirmed', source: 'manual', notes: '' })
+const vehicleSpecRules = {
+  spec_label: [requiredFieldRule('请填写规格名称')]
+}
 const serviceItemDialogVisible = ref(false)
+const serviceItemFormRef = ref(null)
 const serviceItemForm = reactive({ id: null, service_name: '', service_code: '', labor_hours: null, labor_price: 80, suggested_price: 0, repair_method: '', notes: '', required_parts: [] })
+const serviceItemRules = {
+  service_name: [requiredFieldRule('请填写标准项目名称')]
+}
 const servicePackageDialogVisible = ref(false)
+const servicePackageFormRef = ref(null)
 const servicePackageForm = reactive({ id: null, package_name: '', package_code: '', description: '', recommended_interval_km: null, recommended_interval_months: null, service_item_ids: [] })
+const servicePackageRules = {
+  package_name: [requiredFieldRule('请填写套餐名称')],
+  service_item_ids: [requiredFieldRule('请至少选择一个标准项目')]
+}
 const manualProcedures = ref([])
 const knowledgeSegments = ref([])
 const segmentFilters = reactive({ chapter: '', keyword: '' })
@@ -1722,11 +1770,15 @@ const serviceManualLocatorVisible = ref(false)
 const currentServiceManualItem = ref(null)
 const serviceManualMatches = ref([])
 const manualProcedureDialogVisible = ref(false)
+const manualProcedureFormRef = ref(null)
 const manualStepDialogVisible = ref(false)
 const manualSaving = ref(false)
 const documentSaving = ref(false)
 const currentManualProcedure = ref(null)
 const manualProcedureForm = reactive({ id: null, name: '', description: '' })
+const manualProcedureRules = {
+  name: [requiredFieldRule('请填写作业卡名称')]
+}
 const manualStepForm = reactive({ steps: [] })
 const knowledgeDocuments = ref([])
 const libraryDocuments = ref([])
@@ -1768,7 +1820,12 @@ const partCategories = ref([])
 const partPager = reactive({ page: 1, size: 50, total: 0 })
 const partFilters = reactive({ category: '', keyword: '' })
 const partDialogVisible = ref(false)
+const partFormRef = ref(null)
 const partForm = reactive({ id: null, part_no: '', name: '', brand: '', category: '', unit: '件', min_stock: 0, sale_price: 0, cost_price: 0, stock_qty: 0, supplier_name: '' })
+const partRules = {
+  part_no: [requiredFieldRule('请填写料号')],
+  name: [requiredFieldRule('请填写名称')]
+}
 const normalizedStoreName = computed(() => String(appSettings.store_name || '').trim() || '机车博士')
 const inventoryHeadText = computed(() => `这里统一维护 ${normalizedStoreName.value} 的标准车型、标准项目、标准配件和标准资料，是全系统唯一的标准口径来源。`)
 const vehicleWorkbenchText = computed(() => '品牌、年款、标准项目和套餐都从这里展开。')
@@ -2243,9 +2300,13 @@ const loadParts = async () => {
   partLoading.value = true
   try {
     const res = await request.get('/mp/catalog/parts', { params: { page: partPager.page, size: partPager.size, category: partFilters.category || '', keyword: partFilters.keyword || '' } })
+    clearPageError()
     partRows.value = res?.items || []
     partOptions.value = partRows.value
     partPager.total = Number(res?.total || 0)
+  } catch (error) {
+    setPageError('加载标准配件库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准配件库失败')
   } finally { partLoading.value = false }
 }
 const loadPartCategories = async () => { partCategories.value = await request.get('/mp/catalog/parts/categories') }
@@ -2257,8 +2318,12 @@ const loadVehicleModels = async () => {
   vehicleLoading.value = true
   try {
     const res = await request.get('/mp/catalog/vehicle-models', { params: { page: vehiclePager.page, size: vehiclePager.size, brand: vehicleFilters.brand || '', model_name: vehicleFilters.model_name || '', category: vehicleFilters.category || '', keyword: vehicleFilters.keyword || '' } })
+    clearPageError()
     vehicleRows.value = res?.items || []
     vehiclePager.total = Number(res?.total || 0)
+  } catch (error) {
+    setPageError('加载标准车型库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准车型库失败')
   } finally { vehicleLoading.value = false }
 }
 const loadServiceItems = async () => {
@@ -2422,10 +2487,19 @@ const loadLibraryDocuments = async () => {
       rows = rows.filter((row) => row?.review_status === 'needs_fix')
     }
     libraryDocuments.value = [...(rows || [])].sort((a, b) => libraryPriorityScore(a) - libraryPriorityScore(b))
+    clearPageError()
+  } catch (error) {
+    setPageError('加载标准资料库失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载标准资料库失败')
   } finally {
     libraryLoading.value = false
     ensureLibraryPolling()
   }
+}
+const retryActiveTabLoad = async () => {
+  if (activeTab.value === 'vehicle') return loadVehicleModels()
+  if (activeTab.value === 'parts') return loadParts()
+  if (activeTab.value === 'documents') return loadLibraryDocuments()
 }
 const applyLibraryQuickFilter = async (mode) => {
   libraryQuickFilter.value = mode
@@ -2442,6 +2516,7 @@ const resetPartFilters = async () => { partFilters.category = ''; partFilters.ke
 const resetLibraryFilters = async () => { libraryQuickFilter.value = 'all'; libraryFilters.category = ''; libraryFilters.parse_status = ''; libraryFilters.review_status = ''; libraryFilters.keyword = ''; await loadLibraryDocuments() }
 const syncCatalog = async () => { syncing.value = true; try { await request.post('/mp/catalog/sync-defaults'); ElMessage.success('车型基础库已同步'); await Promise.all([loadVehicleBrands(), loadVehicleCategories(), loadVehicleModels(), loadPartCategories(), loadParts()]) } finally { syncing.value = false } }
 const loadAppSettings = async () => {
+  if (!getAuthToken()) return
   try {
     const data = await request.get('/mp/settings')
     applyAppSettings(appSettings, data)
@@ -2458,7 +2533,7 @@ const openVehicleDialog = (row = null) => {
   vehicleDialogVisible.value = true
 }
 const saveVehicle = async () => {
-  if (!vehicleForm.brand || !vehicleForm.model_name) return ElMessage.warning('请填写品牌和车型')
+  if (!(await validateForm(vehicleFormRef.value))) return
   vehicleSaving.value = true
   try {
     const payload = { ...vehicleForm, displacement_cc: vehicleForm.displacement_cc == null ? null : Number(vehicleForm.displacement_cc), is_active: true }
@@ -2517,7 +2592,7 @@ const openVehicleSpecDialog = (row = null) => {
 }
 const saveVehicleSpec = async () => {
   if (!vehicleDetail.id) return
-  if (!vehicleSpecForm.spec_label) return ElMessage.warning('请填写参数名称')
+  if (!(await validateForm(vehicleSpecFormRef.value))) return
   vehicleSpecSaving.value = true
   try {
     const payload = {
@@ -2557,7 +2632,7 @@ const openServiceItemDialog = (row = null) => {
 }
 const saveServiceItem = async () => {
   if (!vehicleDetail.id) return
-  if (!serviceItemForm.service_name) return ElMessage.warning('请填写标准项目名称')
+  if (!(await validateForm(serviceItemFormRef.value))) return
   serviceItemSaving.value = true
   try {
     const payload = { service_name: serviceItemForm.service_name, service_code: serviceItemForm.service_code || null, labor_hours: serviceItemForm.labor_hours == null ? null : Number(serviceItemForm.labor_hours), labor_price: Number(serviceItemForm.labor_price || 0), suggested_price: Number(serviceItemForm.suggested_price || 0), repair_method: serviceItemForm.repair_method || null, notes: serviceItemForm.notes || null, sort_order: 100, is_active: true, required_parts: serviceItemForm.required_parts.map((item, index) => ({ part_id: item.part_id || null, part_no: item.part_no || null, part_name: item.part_name, qty: Number(item.qty || 1), unit_price: Number(item.unit_price || 0), notes: item.notes || null, sort_order: Number(item.sort_order || ((index + 1) * 10)), is_optional: Boolean(item.is_optional) })) }
@@ -2616,8 +2691,7 @@ const openServicePackageDialog = (row = null) => {
 }
 const saveServicePackage = async () => {
   if (!vehicleDetail.id) return
-  if (!servicePackageForm.package_name) return ElMessage.warning('请填写套餐名称')
-  if (!(servicePackageForm.service_item_ids || []).length) return ElMessage.warning('请至少选择一个标准项目')
+  if (!(await validateForm(servicePackageFormRef.value))) return
   servicePackageSaving.value = true
   try {
     const payload = {
@@ -2667,7 +2741,7 @@ const openManualProcedureDialog = (row = null) => {
 }
 const saveManualProcedure = async () => {
   if (!vehicleDetail.id) return
-  if (!manualProcedureForm.name) return ElMessage.warning('请填写标准手册条目名称')
+  if (!(await validateForm(manualProcedureFormRef.value))) return
   manualSaving.value = true
   try {
     const payload = { name: manualProcedureForm.name, description: manualProcedureForm.description || null }
@@ -3184,7 +3258,7 @@ const removeKnowledgeDocument = async (row) => {
 }
 const openPartDialog = (row = null) => { Object.assign(partForm, row ? { ...row } : { id: null, part_no: '', name: '', brand: '', category: '', unit: '件', min_stock: 0, sale_price: 0, cost_price: 0, stock_qty: 0, supplier_name: '' }); partDialogVisible.value = true }
 const savePart = async () => {
-  if (!partForm.part_no || !partForm.name) return ElMessage.warning('请填写料号和名称')
+  if (!(await validateForm(partFormRef.value))) return
   partSaving.value = true
   try {
     const payload = { ...partForm, min_stock: Number(partForm.min_stock || 0), sale_price: Number(partForm.sale_price || 0), cost_price: Number(partForm.cost_price || 0), stock_qty: Number(partForm.stock_qty || 0), compatible_model_ids: [], is_active: true }

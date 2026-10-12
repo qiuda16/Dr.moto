@@ -1,6 +1,19 @@
 ﻿<template>
   <div class="order-list">
     <div class="card">
+      <el-alert
+        v-if="pageError"
+        :title="pageError"
+        type="error"
+        show-icon
+        :closable="false"
+        class="page-alert"
+      >
+        <template #default>
+          <el-button text type="primary" @click="refresh">重新加载工单中心</el-button>
+        </template>
+      </el-alert>
+
       <div class="status-tabs">
         <el-tag
           v-for="item in quickStatusesLite"
@@ -41,7 +54,16 @@
         <span class="queue-pill">{{ `今日新接 ${todayCreatedCount}` }}</span>
       </div>
 
-      <el-table :data="orders" v-loading="loading" style="width: 100%" :row-class-name="orderRowClassName" @selection-change="onOrderSelectionChange" @row-dblclick="onOrderRowDblClick">
+      <el-table
+        :data="orders"
+        v-loading="loading"
+        :element-loading-text="TABLE_LOADING_TEXT"
+        :empty-text="EMPTY_TEXT.orderList"
+        style="width: 100%"
+        :row-class-name="orderRowClassName"
+        @selection-change="onOrderSelectionChange"
+        @row-dblclick="onOrderRowDblClick"
+      >
         <el-table-column type="selection" width="44" />
         <el-table-column v-if="!simpleMode" prop="id" label="工单编号" min-width="220" />
         <el-table-column prop="vehicle_plate" label="车牌" width="130" />
@@ -338,6 +360,7 @@
             </el-form>
             <div class="inspection-actions">
               <el-button type="primary" :loading="savingDelivery" @click="saveDeliveryChecklist">保存交车确认</el-button>
+              <el-button type="success" :loading="savingDelivery" plain @click="saveDeliveryChecklist(true)">保存并记录线下收款</el-button>
             </div>
           </div>
         </div>
@@ -421,7 +444,7 @@
                 </div>
               </div>
               <div class="minor-title">标准项目</div>
-              <el-table :data="servicePlan.standard_items" size="small" style="width: 100%">
+              <el-table :data="servicePlan.standard_items" size="small" :empty-text="EMPTY_TEXT.standardItems" style="width: 100%">
                 <el-table-column prop="service_name" label="项目" min-width="170" />
                 <el-table-column prop="labor_hours" label="工时" width="80" />
                 <el-table-column prop="suggested_price" label="建议价" width="100" />
@@ -445,7 +468,7 @@
 
             <div>
               <div class="minor-title">本工单已选项目</div>
-              <el-table :data="servicePlan.selected_items" size="small" style="width: 100%">
+              <el-table :data="servicePlan.selected_items" size="small" :empty-text="EMPTY_TEXT.selectedItems" style="width: 100%">
                 <el-table-column prop="service_name" label="项目" min-width="170" />
                 <el-table-column prop="parts_total" label="配件费" width="90" />
                 <el-table-column prop="labor_price" label="工时费" width="90" />
@@ -805,14 +828,14 @@
       </div>
     </el-drawer>
     <el-dialog v-model="createDialogVisible" title="手动开单（备用）" width="640px">
-      <el-form :model="createForm" label-width="110px">
-        <el-form-item label="客户">
+      <el-form ref="createOrderFormRef" :model="createForm" :rules="createOrderRules" label-width="110px">
+        <el-form-item prop="customer_id" :label="requiredLabel('客户')">
           <el-select v-model="createForm.customer_id" filterable remote reserve-keyword placeholder="搜索客户姓名 / 手机号" :remote-method="searchCustomers" :loading="customerLoading" style="width: 100%;">
             <el-option v-for="item in customerOptions" :key="item.id" :label="`${item.name || '-'} (${item.phone || '-'})`" :value="String(item.id)" />
           </el-select>
         </el-form-item>
-        <el-form-item label="车牌"><el-input v-model="createForm.vehicle_plate" maxlength="30" show-word-limit placeholder="例如：沪A12345" /></el-form-item>
-        <el-form-item label="客户主诉"><el-input v-model="createForm.description" type="textarea" :rows="3" maxlength="500" show-word-limit /></el-form-item>
+        <el-form-item prop="vehicle_plate" :label="requiredLabel('车牌')"><el-input v-model="createForm.vehicle_plate" maxlength="30" show-word-limit placeholder="例如：沪A12345" /></el-form-item>
+        <el-form-item prop="description" :label="requiredLabel('客户主诉')"><el-input v-model="createForm.description" type="textarea" :rows="3" maxlength="500" show-word-limit /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
@@ -821,7 +844,7 @@
     </el-dialog>
 
     <el-dialog v-model="quickIntakeVisible" title="快速接车" width="760px">
-      <el-form label-width="120px">
+      <el-form ref="quickIntakeFormRef" :model="quickIntakeModel" :rules="quickIntakeRules" label-width="120px">
         <div class="intake-summary">
           <div class="summary-pill">1. 选择客户类型</div>
           <div class="summary-pill">2. 确认车辆</div>
@@ -835,12 +858,12 @@
         </el-form-item>
 
         <template v-if="intakeMode === 'existing'">
-          <el-form-item label="客户">
+          <el-form-item prop="createForm.customer_id" :label="requiredLabel('客户')">
             <el-select v-model="createForm.customer_id" filterable remote reserve-keyword placeholder="搜索客户姓名 / 手机号" :remote-method="searchCustomers" :loading="customerLoading" style="width: 100%;">
               <el-option v-for="item in customerOptions" :key="item.id" :label="`${item.name || '-'} (${item.phone || '-'})`" :value="String(item.id)" />
             </el-select>
           </el-form-item>
-          <el-form-item label="车牌">
+          <el-form-item prop="createForm.vehicle_plate" :label="requiredLabel('车牌')">
             <el-select v-model="createForm.vehicle_plate" filterable allow-create default-first-option placeholder="可选择已有车牌，或直接输入新车牌" style="width: 100%;">
               <el-option v-for="item in customerVehicles" :key="item.id" :label="item.license_plate" :value="item.license_plate" />
             </el-select>
@@ -851,23 +874,23 @@
         <template v-else>
           <div class="intake-section-title">客户信息</div>
           <el-row :gutter="12">
-            <el-col :span="8"><el-form-item label="姓名"><el-input v-model="newCustomer.name" maxlength="80" show-word-limit /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item prop="newCustomer.name" :label="requiredLabel('姓名')"><el-input v-model="newCustomer.name" maxlength="80" show-word-limit /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="手机号"><el-input v-model="newCustomer.phone" maxlength="40" show-word-limit /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="邮箱"><el-input v-model="newCustomer.email" maxlength="120" show-word-limit /></el-form-item></el-col>
           </el-row>
 
           <div class="intake-section-title">车辆信息</div>
           <el-row :gutter="12">
-            <el-col :span="8"><el-form-item label="车牌"><el-input v-model="newCustomer.vehicle_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item prop="newCustomer.vehicle_plate" :label="requiredLabel('车牌')"><el-input v-model="newCustomer.vehicle_plate" maxlength="30" show-word-limit /></el-form-item></el-col>
             <el-col :span="8">
-              <el-form-item label="品牌">
+              <el-form-item prop="newCustomer.make" :label="requiredLabel('品牌')">
                 <el-select v-model="newCustomer.make" filterable allow-create default-first-option style="width: 100%;" @change="onQuickBrandChange">
                   <el-option v-for="item in vehicleBrandOptions" :key="item" :label="item" :value="item" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="车型">
+              <el-form-item prop="newCustomer.model" :label="requiredLabel('车型')">
                 <div class="model-editor">
                   <el-select v-model="newCustomer.catalog_model_id" filterable clearable style="width: 100%;" @change="onQuickModelSelect">
                     <el-option
@@ -883,14 +906,14 @@
             </el-col>
           </el-row>
           <el-row :gutter="12">
-            <el-col :span="8"><el-form-item label="年份"><el-input-number v-model="newCustomer.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item prop="newCustomer.year" :label="requiredLabel('年份')"><el-input-number v-model="newCustomer.year" :min="1950" :max="2100" controls-position="right" style="width: 100%;" /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="发动机号"><el-input v-model="newCustomer.engine_code" maxlength="80" show-word-limit /></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="VIN"><el-input v-model="newCustomer.vin" maxlength="64" show-word-limit /></el-form-item></el-col>
           </el-row>
           <div class="intake-hint">新客户只填核心信息即可，后续更详细的车辆参数可以在客户档案和体检表里补充。</div>
         </template>
 
-        <el-form-item label="客户主诉">
+        <el-form-item prop="createForm.description" :label="requiredLabel('客户主诉')">
           <div class="complaint-editor">
             <el-input v-model="createForm.description" type="textarea" :rows="3" maxlength="500" show-word-limit />
             <div class="complaint-chips">
@@ -1059,8 +1082,12 @@
 import { computed, reactive, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request from '../utils/request'
+import { getAuthToken } from '../utils/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { applyAppSettings, createAppSettingsState } from '../composables/appSettings'
+import { requiredLabel } from '../utils/labels'
+import { createPageFeedbackState } from '../composables/pageFeedback'
+import { EMPTY_TEXT, TABLE_LOADING_TEXT } from '../constants/uiState'
 
 const orders = ref([])
 const loading = ref(false)
@@ -1081,6 +1108,7 @@ const customerVehicles = ref([])
 const vehicleBrandOptions = ref([])
 const vehicleModelOptionsByBrand = ref({})
 const intakeMode = ref('existing')
+const { pageError, clearPageError, setPageError } = createPageFeedbackState()
 const selectedOrderIds = ref([])
 const pinnedOrderIds = ref([])
 const pendingOpenOrderId = ref('')
@@ -1161,6 +1189,31 @@ const statusCounts = ref({})
 const simpleMode = ref(true)
 const createForm = reactive({ customer_id: '', vehicle_plate: '', description: '' })
 const newCustomer = reactive({ name: '', phone: '', email: '', vehicle_plate: '', make: '', model: '', catalog_model_id: null, year: new Date().getFullYear(), engine_code: '', vin: '' })
+const createOrderFormRef = ref(null)
+const quickIntakeFormRef = ref(null)
+const quickIntakeModel = { createForm, newCustomer }
+const requiredRule = (message) => ({ required: true, message, trigger: ['blur', 'change'] })
+const createOrderRules = {
+  customer_id: [requiredRule('请选择客户')],
+  vehicle_plate: [requiredRule('请填写车牌')],
+  description: [requiredRule('请填写客户主诉')]
+}
+const quickIntakeRules = computed(() => {
+  const rules = {
+    'createForm.description': [requiredRule('请填写客户主诉')]
+  }
+  if (intakeMode.value === 'existing') {
+    rules['createForm.customer_id'] = [requiredRule('请选择客户')]
+    rules['createForm.vehicle_plate'] = [requiredRule('请选择车牌')]
+  } else {
+    rules['newCustomer.name'] = [requiredRule('请填写客户姓名')]
+    rules['newCustomer.vehicle_plate'] = [requiredRule('请填写车牌')]
+    rules['newCustomer.make'] = [requiredRule('请选择品牌')]
+    rules['newCustomer.model'] = [requiredRule('请填写车型')]
+    rules['newCustomer.year'] = [requiredRule('请填写年份')]
+  }
+  return rules
+})
 const quickStatusesLite = [{ key: '', label: '全部' }, { key: 'draft', label: '草稿' }, { key: 'confirmed', label: '已接车' }, { key: 'diagnosing', label: '症状+检测' }, { key: 'quoted', label: '待施工' }, { key: 'in_progress', label: '施工中' }, { key: 'ready', label: '待交付' }, { key: 'done', label: '已完成' }]
 const secondaryPanels = ref([])
 const fallbackComplaintTemplates = [
@@ -1911,6 +1964,7 @@ const applyActiveQuoteAmount = () => {
   ElMessage.success('已带入当前生效报价金额')
 }
 const loadAppSettings = async () => {
+  if (!getAuthToken()) return
   try {
     const data = await request.get('/mp/settings')
     applyAppSettings(appSettings, data)
@@ -2170,8 +2224,12 @@ const handleKnowledgePreviewHotkey = (event) => {
     jumpKnowledgePreviewPage(1)
   }
 }
-const saveDeliveryChecklist = async () => {
+const saveDeliveryChecklist = async (recordPayment = false) => {
   if (!currentOrder.value?.id) return
+  if (recordPayment && (!deliveryForm.payment_method || deliveryForm.payment_amount == null || Number(deliveryForm.payment_amount) <= 0)) {
+    ElMessage.warning('请先填写有效的收款方式和金额')
+    return
+  }
   savingDelivery.value = true
   try {
     await request.put(`/mp/workorders/${currentOrder.value.id}/delivery-checklist`, {
@@ -2183,7 +2241,17 @@ const saveDeliveryChecklist = async () => {
       payment_amount: deliveryForm.payment_amount,
       notes: deliveryForm.notes || ''
     })
-    ElMessage.success('交车确认清单已保存')
+    if (recordPayment) {
+      await request.post(`/mp/workorders/${currentOrder.value.id}/offline-payment`, {
+        amount: Number(deliveryForm.payment_amount),
+        payment_method: deliveryForm.payment_method,
+        payer_note: deliveryForm.notes || ''
+      })
+      deliveryForm.payment_confirmed = true
+      ElMessage.success('交车确认和线下收款已记录')
+    } else {
+      ElMessage.success('交车确认清单已保存')
+    }
   } finally {
     savingDelivery.value = false
   }
@@ -2212,6 +2280,7 @@ const refresh = async () => {
   loading.value = true
   try {
     const res = await request.get('/mp/workorders/list/page', { params: { page: pagination.page, size: pagination.size, status: filters.status || '', customer_id: filters.customer_id || '', plate: filters.plate || '' } })
+    clearPageError()
     const rows = res.items || []
     const pinned = rows.filter((row) => pinnedOrderIds.value.includes(row.id))
     const normal = rows.filter((row) => !pinnedOrderIds.value.includes(row.id))
@@ -2219,6 +2288,9 @@ const refresh = async () => {
     pagination.total = res.total || 0
     await loadStatusCounts()
     await handlePendingOrderFocus()
+  } catch (error) {
+    setPageError('加载工单中心失败，请稍后重试', error)
+    ElMessage.error(error?.message || '加载工单中心失败')
   } finally { loading.value = false }
 }
 const resetFilters = () => { filters.status = ''; filters.customer_id = ''; filters.plate = ''; activeStatus.value = ''; pagination.page = 1; router.replace({ query: {} }) }
@@ -2404,7 +2476,8 @@ const finalizeCreatedOrder = async (result, successMessage, dialogKey) => {
   if (createdId) await openOrderDetail(createdId)
 }
 const submitCreateOrder = async () => {
-  if (!createForm.customer_id || !createForm.vehicle_plate || !createForm.description) return ElMessage.warning('请填写客户、车牌和客户主诉')
+  const valid = await createOrderFormRef.value?.validate().catch(() => false)
+  if (!valid) return
   creating.value = true
   try {
     const result = await request.post('/mp/workorders/', createForm)
@@ -2412,7 +2485,8 @@ const submitCreateOrder = async () => {
   } finally { creating.value = false }
 }
 const submitQuickIntake = async () => {
-  if (!createForm.description) return ElMessage.warning('请填写客户主诉')
+  const valid = await quickIntakeFormRef.value?.validate().catch(() => false)
+  if (!valid) return
   creatingQuick.value = true
   try {
     let customerId = createForm.customer_id; let plate = createForm.vehicle_plate

@@ -1,0 +1,44 @@
+name: Trial core tests and staff build
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'bff/**'
+      - 'clients/web_staff/**'
+      - '.github/workflows/trial_core_build.yml'
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: sqlite:///./trial-ci.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: bff/requirements.txt
+      - run: pip install -r bff/requirements.txt
+      - name: Test trial, customer, account and startup contracts
+        run: python -m pytest -q bff/tests/test_trial_ops.py bff/tests/test_mp_customer_api.py bff/tests/test_staff_account_safety.py bff/tests/test_startup_validation.py bff/tests/test_text_support.py
+  staff-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: clients/web_staff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: clients/web_staff/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drmoto-staff
+          path: clients/web_staff/dist
+          if-no-files-found: error

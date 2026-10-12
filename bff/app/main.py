@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import uuid
 import logging
 import time
+import locale
 from datetime import datetime, timezone
 
 from .core.config import settings
@@ -24,7 +25,7 @@ from .core.migrations import apply_pending_migrations, pending_versions
 from .integrations.odoo import odoo_client
 
 # Import Routers
-from .routers import work_orders, payments, ops, auth, events, inventory, knowledge, quotes, dashboard, catalog, customer_app, ai_ops, ai_assistant, settings as app_settings
+from .routers import work_orders, payments, ops, auth, events, inventory, knowledge, quotes, dashboard, catalog, customer_app, ai_ops, ai_assistant, settings as app_settings, trial_ops
 
 # Initialize Logging
 setup_logging()
@@ -32,6 +33,11 @@ logger = logging.getLogger("bff")
 
 def collect_production_startup_issues() -> list[str]:
     issues: list[str] = []
+    preferred_encoding = (locale.getpreferredencoding(False) or "").lower()
+    if "utf" not in preferred_encoding:
+        issues.append(
+            f"Runtime preferred encoding is not UTF-8 ({preferred_encoding}); set UTF-8 locale to avoid Chinese text corruption"
+        )
     if settings.SECRET_KEY == "your-secret-key-change-me-in-production":
         issues.append("SECRET_KEY is using default value")
     if settings.ADMIN_PASSWORD == "change_me_now" and not settings.ADMIN_PASSWORD_HASH:
@@ -40,8 +46,8 @@ def collect_production_startup_issues() -> list[str]:
         issues.append("BFF_ENABLE_DEV_ENDPOINTS must be false in production")
     if settings.ENABLE_MOCK_PAYMENT:
         issues.append("BFF_ENABLE_MOCK_PAYMENT must be false in production")
-    if settings.PAYMENT_PROVIDER == "mock":
-        issues.append("BFF_PAYMENT_PROVIDER must not be mock in production")
+    if settings.PAYMENT_PROVIDER in {"mock", ""}:
+        issues.append("BFF_PAYMENT_PROVIDER must be offline or a configured real provider in production")
     if not settings.WEBHOOK_SHARED_SECRET:
         issues.append("BFF_WEBHOOK_SHARED_SECRET must be configured in production")
     if not settings.PAYMENT_WEBHOOK_SECRET:
@@ -82,6 +88,15 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Skipping automatic table creation (auto-create disabled).")
 
+    try:
+        from .routers.auth import ensure_seed_staff_accounts
+        from sqlalchemy.orm import Session
+        with Session(bind=engine) as db:
+            ensure_seed_staff_accounts(db)
+        logger.info("Seeded staff accounts if missing.")
+    except Exception as exc:
+        logger.warning("Failed to seed staff accounts: %s", exc)
+
     pending = pending_versions(engine)
     if settings.AUTO_APPLY_MIGRATIONS:
         applied = apply_pending_migrations(engine)
@@ -114,6 +129,35 @@ app.add_middleware(
 async def add_process_time_header(request: Request, call_next):
     trace_id = request.headers.get("X-Trace-Id", str(uuid.uuid4()))
     request.state.trace_id = trace_id
+    content_length = request.headers.get("content-length")
+    if content_length and request.method in {"POST", "PUT", "PATCH"}:
+        try:
+            content_length_value = int(content_length)
+        except ValueError:
+            content_length_value = -1
+        if content_length_value < 0:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": {"code": "INVALID_CONTENT_LENGTH", "message": "Invalid Content-Length header"},
+                    "trace_id": trace_id,
+                    "time": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        if content_length_value > settings.MAX_REQUEST_BODY_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "success": False,
+                    "error": {
+                        "code": "REQUEST_ENTITY_TOO_LARGE",
+                        "message": f"Request body too large (limit={settings.MAX_REQUEST_BODY_BYTES} bytes)",
+                    },
+                    "trace_id": trace_id,
+                    "time": datetime.now(timezone.utc).isoformat(),
+                },
+            )
     start_at = time.time()
     HTTP_IN_PROGRESS.inc()
     try:
@@ -246,5 +290,6 @@ app.include_router(dashboard.router)
 app.include_router(catalog.router)
 app.include_router(app_settings.router)
 app.include_router(customer_app.router)
+app.include_router(trial_ops.router)
 app.include_router(ai_ops.router)
 app.include_router(ai_assistant.router)

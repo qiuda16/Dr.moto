@@ -1,0 +1,79 @@
+name: drmoto-integration
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: integration-only
+      POSTGRES_DB: odoo
+    volumes:
+      - integration_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d odoo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:16379:6379"
+  bff-db-init:
+    image: postgres:15
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: integration-only
+    entrypoint: ["psql", "-h", "db", "-U", "odoo", "-d", "odoo", "-v", "ON_ERROR_STOP=1", "-f", "/init.sql"]
+    volumes:
+      - ./init-integration-bff.sql:/init.sql:ro
+  bff:
+    image: ${INTEGRATION_BFF_IMAGE:-infra-bff:latest}
+    build:
+      context: ../bff
+    depends_on:
+      bff-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      odoo:
+        condition: service_started
+    working_dir: /app
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      ENV: dev
+      DATABASE_URL: postgresql://odoo:integration-only@db:5432/bff
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: odoo
+      ODOO_USER: admin
+      ODOO_PASSWORD: admin
+      REDIS_URL: redis://redis:6379/0
+      PAYMENT_PROVIDER: offline
+      ENABLE_MOCK_PAYMENT: "false"
+      DB_AUTO_CREATE_TABLES: "true"
+      AUTO_APPLY_MIGRATIONS: "true"
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:28080:8080"
+    volumes:
+      - ../bff:/app:ro
+  odoo:
+    image: odoo:18.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: integration-only
+    command: ["odoo", "-d", "odoo", "-i", "drmoto_mro", "--without-demo=all", "--http-interface=0.0.0.0"]
+    ports:
+      - "127.0.0.1:18069:8069"
+    volumes:
+      - integration_odoo:/var/lib/odoo
+      - ../odoo/addons:/mnt/extra-addons:ro
+
+volumes:
+  integration_db:
+  integration_odoo:
