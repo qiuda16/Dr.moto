@@ -1,0 +1,18 @@
+{
+  "name": "机车博士 DrMoto",
+  "short_name": "机车博士",
+  "description": "让机车维修透明可追踪。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0d0f",
+  "theme_color": "#0b0d0f",
+  "icons": [
+    {
+      "src": "brand-logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

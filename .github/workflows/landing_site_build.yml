@@ -1,0 +1,28 @@
+name: Build DrMoto website
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'clients/landing_site/**'
+      - '.github/workflows/landing_site_build.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: clients/landing_site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: clients/landing_site/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drmoto-website
+          path: clients/landing_site/dist
+          if-no-files-found: error
